@@ -8,11 +8,11 @@ import {
   PrimaryButton,
   Row,
   ScreenContainer,
-  ScreenTitle,
   SectionTitle,
   StatRow,
 } from '../../components/ui/primitives';
 import { useAppState } from '../app/app-context';
+import { ProfileHeader } from './profile-header';
 
 export function ProfileScreen() {
   const router = useRouter();
@@ -25,9 +25,12 @@ export function ProfileScreen() {
 
   return (
     <ScreenContainer>
-      <ScreenTitle title="Profile" subtitle="Privacy and personal settings" />
-
-      <StatRow label="Email" value={user.email} />
+      <ProfileHeader
+        displayName={user.displayName}
+        email={user.email}
+        avatarUri={null}
+        onEditProfilePress={() => router.push('/profile/edit')}
+      />
       <StatRow label="Mode" value={user.relationshipMode === 'solo' ? 'Solo' : 'Partner-linked'} />
 
       <Row>

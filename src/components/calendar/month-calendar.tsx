@@ -1,9 +1,63 @@
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import type { ThemeColors } from '../../constants/theme';
-import { createMonthMatrix, toDateInput } from '../../lib/date';
+import type { Theme, ThemeColors } from '../../theme';
+import { toDateInput } from '../../lib/date';
+import { useTheme } from '../../theme/use-theme';
 import type { IntimacyEvent } from '../../types/models';
-import { useAppState } from '../../features/app/app-context';
+
+type CalendarDayCell = {
+  dateKey: string;
+  dayLabel: number;
+  inCurrentMonth: boolean;
+};
+
+function createMonthGrid(year: number, month: number): CalendarDayCell[][] {
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPreviousMonth = new Date(year, month, 0).getDate();
+
+  const flatCells: CalendarDayCell[] = [];
+
+  for (let index = 0; index < 42; index += 1) {
+    const dayOffset = index - firstDay + 1;
+
+    if (dayOffset < 1) {
+      const day = daysInPreviousMonth + dayOffset;
+      const date = new Date(year, month - 1, day);
+      flatCells.push({
+        dateKey: toDateInput(date),
+        dayLabel: day,
+        inCurrentMonth: false,
+      });
+      continue;
+    }
+
+    if (dayOffset > daysInMonth) {
+      const day = dayOffset - daysInMonth;
+      const date = new Date(year, month + 1, day);
+      flatCells.push({
+        dateKey: toDateInput(date),
+        dayLabel: day,
+        inCurrentMonth: false,
+      });
+      continue;
+    }
+
+    const date = new Date(year, month, dayOffset);
+    flatCells.push({
+      dateKey: toDateInput(date),
+      dayLabel: dayOffset,
+      inCurrentMonth: true,
+    });
+  }
+
+  const rows: CalendarDayCell[][] = [];
+  for (let i = 0; i < flatCells.length; i += 7) {
+    rows.push(flatCells.slice(i, i + 7));
+  }
+
+  return rows;
+}
 
 export function MonthCalendar({
   year,
@@ -18,17 +72,26 @@ export function MonthCalendar({
   events: IntimacyEvent[];
   onSelectDate: (date: string) => void;
 }) {
-  const { colors } = useAppState();
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const { colors, theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme, colors), [colors, theme]);
 
-  const matrix = createMonthMatrix(year, month);
-  const eventsByDay = new Set(events.map((event) => event.dateTimeStart.slice(0, 10)));
+  const matrix = useMemo(() => createMonthGrid(year, month), [month, year]);
+  const eventCountByDay = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const event of events) {
+      const key = event.dateTimeStart.slice(0, 10);
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }, [events]);
+
+  const dotColors = [colors.accent, colors.accentText, colors.danger, colors.textMuted];
 
   return (
-    <View>
+    <View style={styles.calendarWrap}>
       <View style={styles.weekHeaderRow}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-          <Text key={day} style={styles.weekHeaderText}>
+        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+          <Text key={`${day}-${index}`} style={styles.weekHeaderText}>
             {day}
           </Text>
         ))}
@@ -36,23 +99,29 @@ export function MonthCalendar({
 
       {matrix.map((week, weekIndex) => (
         <View key={`${weekIndex}`} style={styles.calendarWeekRow}>
-          {week.map((day, dayIndex) => {
-            if (!day) {
-              return <View key={`empty-${weekIndex}-${dayIndex}`} style={styles.calendarCell} />;
-            }
-
-            const key = toDateInput(new Date(year, month, day));
-            const isSelected = key === selectedDate;
-            const hasEvents = eventsByDay.has(key);
+          {week.map((cell) => {
+            const isSelected = cell.dateKey === selectedDate;
+            const eventCount = eventCountByDay.get(cell.dateKey) ?? 0;
 
             return (
               <Pressable
-                key={key}
+                key={cell.dateKey}
                 style={[styles.calendarCell, isSelected ? styles.calendarCellSelected : null]}
-                onPress={() => onSelectDate(key)}
+                onPress={() => onSelectDate(cell.dateKey)}
               >
-                <Text style={styles.calendarDate}>{day}</Text>
-                {hasEvents ? <View style={styles.dot} /> : null}
+                <Text style={[styles.calendarDate, !cell.inCurrentMonth ? styles.calendarDateOutside : null]}>
+                  {cell.dayLabel}
+                </Text>
+                {eventCount > 0 ? (
+                  <View style={styles.dotRow}>
+                    {new Array(Math.min(4, eventCount)).fill(null).map((_, dotIndex) => (
+                      <View
+                        key={`${cell.dateKey}-${dotIndex}`}
+                        style={[styles.dot, { backgroundColor: dotColors[dotIndex % dotColors.length] }]}
+                      />
+                    ))}
+                  </View>
+                ) : null}
               </Pressable>
             );
           })}
@@ -62,49 +131,59 @@ export function MonthCalendar({
   );
 }
 
-function createStyles(colors: ThemeColors) {
+function createStyles(theme: Theme, colors: ThemeColors) {
   return StyleSheet.create({
+    calendarWrap: {
+      paddingVertical: theme.spacing.xs,
+    },
     weekHeaderRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      marginTop: 8,
+      marginBottom: theme.spacing.xs,
     },
     weekHeaderText: {
       flex: 1,
       textAlign: 'center',
       color: colors.textMuted,
-      fontSize: 12,
+      fontSize: theme.typography.fontSize.xs,
+      lineHeight: theme.typography.lineHeight.xs,
     },
     calendarWeekRow: {
       flexDirection: 'row',
-      marginTop: 4,
+      marginTop: theme.spacing.xxs,
     },
     calendarCell: {
       flex: 1,
-      minHeight: 44,
-      borderWidth: 1,
-      borderColor: colors.borderMuted,
-      borderRadius: 8,
-      margin: 2,
+      minHeight: 48,
+      borderRadius: theme.radius.md,
+      marginHorizontal: theme.spacing.xxs,
+      marginVertical: theme.spacing.xxs,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: colors.surface,
+      gap: theme.spacing.xxs,
     },
     calendarCellSelected: {
-      borderColor: colors.accent,
       backgroundColor: colors.selectedSurface,
     },
     calendarDate: {
       color: colors.textPrimary,
-      fontSize: 13,
+      fontSize: theme.typography.fontSize.sm,
+      lineHeight: theme.typography.lineHeight.sm,
       fontWeight: '600',
     },
+    calendarDateOutside: {
+      color: colors.textMuted,
+      opacity: 0.6,
+    },
+    dotRow: {
+      flexDirection: 'row',
+      gap: theme.spacing.xxs,
+      alignItems: 'center',
+    },
     dot: {
-      marginTop: 3,
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.accent,
+      width: 4,
+      height: 4,
+      borderRadius: 2,
     },
   });
 }

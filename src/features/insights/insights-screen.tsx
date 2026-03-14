@@ -33,8 +33,6 @@ export function InsightsScreen() {
 
   return (
     <ScreenContainer>
-      <ScreenTitle title="Insights" subtitle="Day / week / month trends" />
-
       <StatRow label="Entries today" value={String(dayEvents.length)} />
       <StatRow label="Entries this week" value={String(weekEvents.length)} />
       <StatRow label="Entries this month" value={String(monthEvents.length)} />

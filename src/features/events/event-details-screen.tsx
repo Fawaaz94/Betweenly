@@ -29,6 +29,15 @@ export function EventDetailsScreen() {
     );
   }
 
+  const handleClose = () => {
+    if (router.canGoBack()) {
+      router.back();
+      return;
+    }
+
+    router.replace('/(tabs)');
+  };
+
   return (
     <ScreenContainer>
       <ScreenTitle title="Event Details" subtitle={formatDateTime(event.dateTimeStart)} />
@@ -50,7 +59,8 @@ export function EventDetailsScreen() {
       {event.whatToTryNext ? <DetailBlock title="What to try next" value={event.whatToTryNext} /> : null}
 
       <Row>
-        <GhostButton label="Close" onPress={() => router.back()} />
+        <GhostButton label="Close" onPress={handleClose} />
+        <GhostButton label="Edit" onPress={() => router.push(`/events/edit/${event.id}`)} />
         <DangerButton
           label="Delete"
           onPress={() => {

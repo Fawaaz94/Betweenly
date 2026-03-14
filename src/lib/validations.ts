@@ -1,5 +1,5 @@
 import { toDateInput, toTimeInput } from './date';
-import type { CreateEventInput, EventType } from '../types/models';
+import type { CreateEventInput, EventType, IntimacyEvent } from '../types/models';
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -59,6 +59,52 @@ export function createDefaultLogEventValues(isLinkedRelationship: boolean): LogE
     whatWorkedWell: '',
     whatToTryNext: '',
     isSharedWithPartner: isLinkedRelationship,
+  };
+}
+
+function splitDateTime(iso: string | null | undefined) {
+  if (!iso) {
+    return { date: '', time: '' };
+  }
+
+  const parsed = new Date(iso);
+  if (!Number.isNaN(+parsed)) {
+    return {
+      date: toDateInput(parsed),
+      time: toTimeInput(parsed),
+    };
+  }
+
+  const [datePart = '', timePart = ''] = iso.split('T');
+  const normalizedTime = timePart.slice(0, 5);
+
+  return {
+    date: datePart.trim(),
+    time: normalizedTime.trim(),
+  };
+}
+
+export function createLogEventFormValuesFromEvent(event: IntimacyEvent): LogEventFormValues {
+  const start = splitDateTime(event.dateTimeStart);
+  const end = splitDateTime(event.dateTimeEnd);
+
+  return {
+    eventType: event.eventType,
+    partnerName: event.partnerName ?? '',
+    startDate: start.date,
+    startTime: start.time,
+    endDate: end.date,
+    endTime: end.time,
+    durationMinutes: String(Math.max(1, event.durationMinutes)),
+    location: event.location,
+    overallRating: String(event.overallRating),
+    emotionalRating: String(event.emotionalRating),
+    notes: event.notes,
+    positions: event.positions,
+    toysUsed: event.toysUsed,
+    whatWorkedWell: event.whatWorkedWell,
+    whatToTryNext: event.whatToTryNext,
+    isSharedWithPartner: Boolean(event.isSharedWithPartner),
   };
 }
 

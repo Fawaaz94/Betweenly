@@ -88,7 +88,7 @@ export default function TabsLayout() {
           options={{
             title: 'Calendar',
             tabBarItemStyle: {
-                paddingRight: 18,
+                paddingRight: 38,
             },
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
@@ -104,7 +104,7 @@ export default function TabsLayout() {
           options={{
               title: 'Insights',
               tabBarItemStyle: {
-                  paddingLeft: 18,
+                  // paddingLeft: 18,
               },
               tabBarIcon: ({ color, focused }) => (
                   <Ionicons

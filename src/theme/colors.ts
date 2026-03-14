@@ -37,68 +37,68 @@ export type ThemeColorTokens = {
 export const colorTokens: Record<ThemeMode, ThemeColorTokens> = {
   light: {
     brand: {
-      primary: '#4B2142',
-      primaryPressed: '#3A1833',
-      secondary: '#C38D9E',
-      mauve: '#D8C3CC',
-      accent: '#E7C8BE',
-      blush: '#F1E7E4',
+      primary: '#E45C5C',
+      primaryPressed: '#C64B4B',
+      secondary: '#F07A7A',
+      mauve: '#D9DEED',
+      accent: '#F7D9D9',
+      blush: '#F4F6FB',
     },
     background: {
-      base: '#F8F3F1',
+      base: '#F6F7FB',
     },
     surface: {
       base: '#FFFFFF',
-      alt: '#F3ECE9',
+      alt: '#F0F2F8',
     },
     text: {
-      primary: '#22181C',
-      secondary: '#6E5A61',
-      tertiary: '#9A8A90',
-      onDark: '#FFF8FA',
+      primary: '#1A1D2B',
+      secondary: '#6B7287',
+      tertiary: '#9AA0B5',
+      onDark: '#FFFFFF',
     },
     border: {
-      default: '#E4D7D9',
-      muted: '#E4D7D9',
+      default: '#E2E5EF',
+      muted: '#ECEFF6',
     },
     semantic: {
-      success: '#8FA58A',
-      warning: '#B86B77',
-      error: '#A55464',
-      info: '#8F7A98',
+      success: '#63A38A',
+      warning: '#F07A7A',
+      error: '#E45C5C',
+      info: '#7E8CC4',
     },
   },
   dark: {
     brand: {
-      primary: '#C38D9E',
-      primaryPressed: '#B86B77',
-      secondary: '#E7C8BE',
-      mauve: '#9D8C93',
-      accent: '#B86B77',
-      blush: '#2E2129',
+      primary: '#E45C5C',
+      primaryPressed: '#C64B4B',
+      secondary: '#F07A7A',
+      mauve: '#6C728A',
+      accent: '#F07A7A',
+      blush: '#2A314F',
     },
     background: {
-      base: '#181116',
+      base: '#0D0F1A',
     },
     surface: {
-      base: '#241A20',
-      alt: '#2E2129',
+      base: '#161B2E',
+      alt: '#1E233A',
     },
     text: {
-      primary: '#F7EEF1',
-      secondary: '#C7B7BE',
-      tertiary: '#9D8C93',
-      onDark: '#FFF8FA',
+      primary: '#FFFFFF',
+      secondary: '#A7ADC3',
+      tertiary: '#6C728A',
+      onDark: '#FFFFFF',
     },
     border: {
-      default: '#45333C',
-      muted: '#45333C',
+      default: '#2E3552',
+      muted: '#242A44',
     },
     semantic: {
-      success: '#8FA58A',
-      warning: '#B86B77',
-      error: '#A55464',
-      info: '#8F7A98',
+      success: '#63A38A',
+      warning: '#F07A7A',
+      error: '#E45C5C',
+      info: '#7E8CC4',
     },
   },
 };
@@ -106,4 +106,3 @@ export const colorTokens: Record<ThemeMode, ThemeColorTokens> = {
 export function getThemeTokens(themeMode: ThemeMode): ThemeColorTokens {
   return colorTokens[themeMode];
 }
-

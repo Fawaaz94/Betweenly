@@ -8,12 +8,13 @@ import {
   initDb,
   insertEvent,
   listEventsDesc,
+  updateIntimacyEvent,
   upsertThemeMode,
   upsertCycleData,
   upsertUserProfile,
 } from '../../db/sqlite';
 import { defaultThemeMode, getThemeColors, type ThemeColors, type ThemeMode } from '../../constants/theme';
-import type { CreateEventInput, CycleData, IntimacyEvent, UserProfile } from '../../types/models';
+import type { CreateEventInput, CycleData, IntimacyEvent, UpdateEventInput, UserProfile } from '../../types/models';
 
 type CreateProfileInput = Pick<UserProfile, 'email' | 'displayName' | 'relationshipMode' | 'cycleTrackingEnabled'>;
 type UpdateUserInput = Pick<UserProfile, 'email' | 'displayName' | 'relationshipMode' | 'cycleTrackingEnabled'>;
@@ -31,6 +32,7 @@ type AppContextValue = {
   setThemeMode: (themeMode: ThemeMode) => Promise<void>;
   toggleThemeMode: () => Promise<void>;
   saveEvent: (event: CreateEventInput) => Promise<IntimacyEvent>;
+  updateEvent: (id: string, updates: UpdateEventInput) => Promise<IntimacyEvent | null>;
   deleteEvent: (id: string) => Promise<void>;
 };
 
@@ -97,6 +99,19 @@ export function AppProvider({ children }: PropsWithChildren) {
     return saved;
   }, []);
 
+  const updateEvent = useCallback(async (id: string, updates: UpdateEventInput) => {
+    const updated = await updateIntimacyEvent(id, updates);
+    if (!updated) return null;
+
+    setEvents((previous) =>
+      previous
+        .map((event) => (event.id === id ? updated : event))
+        .sort((a, b) => +new Date(b.dateTimeStart) - +new Date(a.dateTimeStart)),
+    );
+
+    return updated;
+  }, []);
+
   const deleteEvent = useCallback(async (id: string) => {
     await deleteEventFromDb(id);
     setEvents((previous) => previous.filter((event) => event.id !== id));
@@ -116,6 +131,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       setThemeMode,
       toggleThemeMode,
       saveEvent,
+      updateEvent,
       deleteEvent,
     }),
     [
@@ -128,6 +144,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       setThemeMode,
       themeMode,
       toggleThemeMode,
+      updateEvent,
       updateCycle,
       updateUser,
       user,

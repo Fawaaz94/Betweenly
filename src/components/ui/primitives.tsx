@@ -1,8 +1,25 @@
-import type { PropsWithChildren } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps, type ViewStyle } from 'react-native';
-import { colors } from '../../constants/theme';
+import { useMemo, type PropsWithChildren } from 'react';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type TextInputProps,
+  type ViewStyle,
+} from 'react-native';
+import type { Theme, ThemeColors } from '../../theme';
+import { useTheme } from '../../theme/use-theme';
+
+function useThemedStyles() {
+  const { colors, theme } = useTheme();
+  return useMemo(() => createStyles(theme, colors), [colors, theme]);
+}
 
 export function ScreenContainer({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
       {children}
@@ -11,6 +28,8 @@ export function ScreenContainer({ children }: PropsWithChildren) {
 }
 
 export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  const styles = useThemedStyles();
+
   return (
     <View style={styles.titleWrap}>
       <Text style={styles.title}>{title}</Text>
@@ -20,14 +39,20 @@ export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: str
 }
 
 export function Label({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.label}>{children}</Text>;
 }
 
 export function Input(props: TextInputProps) {
+  const styles = useThemedStyles();
+  const { colors } = useTheme();
+
   return <TextInput placeholderTextColor={colors.textMuted} {...props} style={[styles.input, props.style]} />;
 }
 
 export function MultilineInput(props: TextInputProps) {
+  const styles = useThemedStyles();
+
   return <Input multiline textAlignVertical="top" {...props} style={[styles.input, styles.textArea, props.style]} />;
 }
 
@@ -40,70 +65,88 @@ export function PrimaryButton({
   onPress: () => void;
   style?: ViewStyle;
 }) {
+  const styles = useThemedStyles();
+
   return (
-    <Pressable onPress={onPress} style={[styles.primaryButton, style]}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.primaryButton, pressed ? styles.primaryButtonPressed : null, style]}>
       <Text style={styles.primaryButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
 export function GhostButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemedStyles();
+
   return (
-    <Pressable onPress={onPress} style={styles.ghostButton}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.ghostButton, pressed ? styles.ghostButtonPressed : null]}>
       <Text style={styles.ghostButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
 export function DangerButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const styles = useThemedStyles();
+
   return (
-    <Pressable onPress={onPress} style={styles.dangerButton}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.dangerButton, pressed ? styles.dangerButtonPressed : null]}>
       <Text style={styles.primaryButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
 export function Row({ children, style }: PropsWithChildren<{ style?: ViewStyle }>) {
+  const styles = useThemedStyles();
   return <View style={[styles.row, style]}>{children}</View>;
 }
 
 export function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useThemedStyles();
+
   return (
-    <Pressable style={[styles.chip, active ? styles.chipActive : null]} onPress={onPress}>
+    <Pressable style={({ pressed }) => [styles.chip, active ? styles.chipActive : null, pressed ? styles.chipPressed : null]} onPress={onPress}>
       <Text style={[styles.chipText, active ? styles.chipTextActive : null]}>{label}</Text>
     </Pressable>
   );
 }
 
 export function Card({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <View style={styles.card}>{children}</View>;
 }
 
 export function CardTitle({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.cardTitle}>{children}</Text>;
 }
 
 export function CardMeta({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.cardMeta}>{children}</Text>;
 }
 
 export function CardBody({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.cardBody}>{children}</Text>;
 }
 
 export function EmptyText({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.emptyText}>{children}</Text>;
 }
 
 export function NoteText({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.note}>{children}</Text>;
 }
 
 export function SectionTitle({ children }: PropsWithChildren) {
+  const styles = useThemedStyles();
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
 export function StatRow({ label, value }: { label: string; value: string }) {
+  const styles = useThemedStyles();
+
   return (
     <View style={styles.statRow}>
       <Text style={styles.statLabel}>{label}</Text>
@@ -112,163 +155,201 @@ export function StatRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-  },
-  screenContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 24,
-    gap: 12,
-  },
-  titleWrap: {
-    marginTop: 8,
-    marginBottom: 6,
-    gap: 4,
-  },
-  title: {
-    color: colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: colors.accentText,
-    fontSize: 14,
-  },
-  sectionTitle: {
-    color: colors.textPrimary,
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 8,
-  },
-  label: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: colors.textPrimary,
-    fontSize: 14,
-  },
-  textArea: {
-    minHeight: 88,
-  },
-  primaryButton: {
-    marginTop: 10,
-    backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  dangerButton: {
-    marginTop: 10,
-    backgroundColor: colors.danger,
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: colors.textPrimary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  ghostButton: {
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    marginTop: 10,
-  },
-  ghostButtonText: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    alignItems: 'center',
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.surfaceAlt,
-  },
-  chipActive: {
-    backgroundColor: '#1D4ED8',
-    borderColor: '#1E40AF',
-  },
-  chipText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: colors.textPrimary,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    padding: 12,
-    gap: 4,
-  },
-  cardTitle: {
-    color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  cardMeta: {
-    color: colors.accentText,
-    fontSize: 12,
-  },
-  cardBody: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    marginTop: 2,
-  },
-  emptyText: {
-    color: colors.textMuted,
-    fontSize: 14,
-  },
-  note: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  statRow: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.borderMuted,
-    borderRadius: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statLabel: {
-    color: colors.textSecondary,
-    fontSize: 14,
-  },
-  statValue: {
-    color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
-    maxWidth: '55%',
-    textAlign: 'right',
-  },
-});
+function createStyles(theme: Theme, colors: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: colors.appBg,
+    },
+    screenContent: {
+      paddingHorizontal: theme.spacing.lg,
+      paddingBottom: theme.spacing.xxl,
+      gap: theme.spacing.md,
+    },
+    titleWrap: {
+      marginTop: theme.spacing.sm,
+      marginBottom: theme.spacing.xs + 2,
+      gap: theme.spacing.xs,
+    },
+    title: {
+      color: colors.textPrimary,
+      fontSize: theme.typography.fontSize.xxl,
+      fontWeight: '700',
+      lineHeight: theme.typography.lineHeight.xxl,
+    },
+    subtitle: {
+      color: colors.accentText,
+      fontSize: theme.typography.fontSize.sm,
+      lineHeight: theme.typography.lineHeight.sm,
+    },
+    sectionTitle: {
+      color: colors.textPrimary,
+      fontSize: theme.typography.fontSize.lg,
+      fontWeight: '600',
+      marginTop: theme.spacing.sm,
+    },
+    label: {
+      color: colors.textSecondary,
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: '600',
+      lineHeight: theme.typography.lineHeight.sm,
+    },
+    input: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: theme.radius.md,
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: theme.spacing.sm + 2,
+      minHeight: theme.sizing.inputHeight,
+      color: colors.textPrimary,
+      fontSize: theme.typography.fontSize.sm,
+      lineHeight: theme.typography.lineHeight.sm,
+    },
+    textArea: {
+      minHeight: theme.sizing.inputHeight * 1.7,
+      paddingTop: theme.spacing.sm + 2,
+    },
+    primaryButton: {
+      marginTop: theme.spacing.sm + 2,
+      backgroundColor: colors.accent,
+      borderRadius: theme.radius.md,
+      minHeight: theme.sizing.buttonHeight,
+      paddingVertical: theme.spacing.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primaryButtonPressed: {
+      backgroundColor: colors.accentPressed,
+    },
+    dangerButton: {
+      marginTop: theme.spacing.sm + 2,
+      backgroundColor: colors.danger,
+      borderRadius: theme.radius.md,
+      minHeight: theme.sizing.buttonHeight,
+      paddingVertical: theme.spacing.md,
+      paddingHorizontal: theme.spacing.lg + 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dangerButtonPressed: {
+      backgroundColor: colors.dangerPressed,
+    },
+    primaryButtonText: {
+      color: colors.textOnAccent,
+      fontWeight: '700',
+      fontSize: theme.typography.fontSize.md,
+      lineHeight: theme.typography.lineHeight.md,
+    },
+    ghostButton: {
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: theme.radius.md,
+      minHeight: theme.sizing.buttonHeight,
+      paddingVertical: theme.spacing.sm + 2,
+      paddingHorizontal: theme.spacing.md + 2,
+      marginTop: theme.spacing.sm + 2,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+    },
+    ghostButtonPressed: {
+      backgroundColor: colors.surfaceAlt,
+    },
+    ghostButtonText: {
+      color: colors.textPrimary,
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: '600',
+      lineHeight: theme.typography.lineHeight.sm,
+    },
+    row: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.sm,
+      alignItems: 'center',
+    },
+    chip: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: theme.radius.pill,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.md,
+      backgroundColor: colors.surfaceAlt,
+    },
+    chipActive: {
+      backgroundColor: colors.chipActiveBg,
+      borderColor: colors.chipActiveBorder,
+    },
+    chipPressed: {
+      opacity: 0.86,
+    },
+    chipText: {
+      color: colors.textSecondary,
+      fontSize: theme.typography.fontSize.xs,
+      fontWeight: '600',
+      lineHeight: theme.typography.lineHeight.xs,
+    },
+    chipTextActive: {
+      color: colors.textOnAccent,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: theme.radius.lg,
+      padding: theme.spacing.md,
+      gap: theme.spacing.xs,
+      ...theme.shadows.card,
+    },
+    cardTitle: {
+      color: colors.textPrimary,
+      fontSize: theme.typography.fontSize.md,
+      fontWeight: '700',
+      lineHeight: theme.typography.lineHeight.md,
+    },
+    cardMeta: {
+      color: colors.accentText,
+      fontSize: theme.typography.fontSize.xs,
+      lineHeight: theme.typography.lineHeight.xs,
+    },
+    cardBody: {
+      color: colors.textSecondary,
+      fontSize: theme.typography.fontSize.sm,
+      lineHeight: theme.typography.lineHeight.sm,
+      marginTop: theme.spacing.xxs,
+    },
+    emptyText: {
+      color: colors.textMuted,
+      fontSize: theme.typography.fontSize.sm,
+      lineHeight: theme.typography.lineHeight.sm,
+    },
+    note: {
+      color: colors.textMuted,
+      fontSize: theme.typography.fontSize.xs,
+      lineHeight: theme.typography.lineHeight.xs,
+    },
+    statRow: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+      borderRadius: theme.radius.md,
+      paddingVertical: theme.spacing.sm + 2,
+      paddingHorizontal: theme.spacing.md,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    statLabel: {
+      color: colors.textSecondary,
+      fontSize: theme.typography.fontSize.sm,
+      lineHeight: theme.typography.lineHeight.sm,
+    },
+    statValue: {
+      color: colors.textPrimary,
+      fontSize: theme.typography.fontSize.sm,
+      fontWeight: '700',
+      lineHeight: theme.typography.lineHeight.sm,
+      maxWidth: '55%',
+      textAlign: 'right',
+    },
+  });
+}

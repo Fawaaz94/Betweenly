@@ -20,20 +20,27 @@ export type EventType = 'solo' | 'partnered';
 
 export type IntimacyEvent = {
   id: string;
+  ownerUserId: string;
   eventType: EventType;
-  partnerDisplayNameSnapshot?: string;
+  partnerName: string | null;
   dateTimeStart: string;
+  dateTimeEnd: string | null;
   durationMinutes: number;
   location: string;
   overallRating: number;
   emotionalRating: number;
   notes: string;
   positions: string;
+  toysUsed: string;
   whatWorkedWell: string;
   whatToTryNext: string;
-  isSharedWithPartner: boolean;
+  isSharedWithPartner?: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export type CreateEventInput = Omit<IntimacyEvent, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateIntimacyEventInput = Omit<IntimacyEvent, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateIntimacyEventInput = Partial<CreateIntimacyEventInput>;
+
+export type CreateEventInput = CreateIntimacyEventInput;
+export type UpdateEventInput = UpdateIntimacyEventInput;

@@ -33,16 +33,19 @@ export function EventDetailsScreen() {
     <ScreenContainer>
       <ScreenTitle title="Event Details" subtitle={formatDateTime(event.dateTimeStart)} />
 
+      <StatRow label="Owner" value={event.ownerUserId} />
       <StatRow label="Type" value={event.eventType} />
-      <StatRow label="Partner" value={event.partnerDisplayNameSnapshot || '-'} />
+      <StatRow label="Partner" value={event.partnerName || '-'} />
       <StatRow label="Duration" value={`${event.durationMinutes} minutes`} />
       <StatRow label="Location" value={event.location || '-'} />
       <StatRow label="Overall rating" value={`${event.overallRating}/5`} />
       <StatRow label="Emotional rating" value={`${event.emotionalRating}/5`} />
       <StatRow label="Visibility" value={event.isSharedWithPartner ? 'Shared' : 'Private'} />
+      <StatRow label="End time" value={event.dateTimeEnd ? formatDateTime(event.dateTimeEnd) : '-'} />
 
       {event.notes ? <DetailBlock title="Notes" value={event.notes} /> : null}
       {event.positions ? <DetailBlock title="Positions / activities" value={event.positions} /> : null}
+      {event.toysUsed ? <DetailBlock title="Toys used" value={event.toysUsed} /> : null}
       {event.whatWorkedWell ? <DetailBlock title="What worked well" value={event.whatWorkedWell} /> : null}
       {event.whatToTryNext ? <DetailBlock title="What to try next" value={event.whatToTryNext} /> : null}
 

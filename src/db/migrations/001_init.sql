@@ -1,2 +1,3 @@
 -- Initial local-first schema for Betweenly V1
 -- Applied by src/db/sqlite.ts
+-- Includes profile, cycle, events, and app_settings(theme_mode).

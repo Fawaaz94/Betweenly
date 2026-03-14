@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { useRouter } from 'expo-router';
 import { CycleSettingsForm } from '../../components/profile/cycle-settings-form';
 import {
   Chip,
+  GhostButton,
   NoteText,
   PrimaryButton,
   Row,
@@ -13,6 +15,7 @@ import {
 import { useAppState } from '../app/app-context';
 
 export function ProfileScreen() {
+  const router = useRouter();
   const { user, updateUser, cycleData, updateCycleData } = useAppState();
   const [draftCycleData, setDraftCycleData] = useState(cycleData);
 
@@ -58,6 +61,9 @@ export function ProfileScreen() {
           />
         </>
       ) : null}
+
+      <SectionTitle>App settings</SectionTitle>
+      <GhostButton label="Open settings" onPress={() => router.push('/(tabs)/settings')} />
 
       <NoteText>
         Privacy labels are intentionally non-explicit. Shared/private boundaries are modeled and ready for partner-linking

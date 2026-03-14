@@ -1,160 +1,193 @@
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
-import { Alert } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text } from 'react-native';
 import { LabeledInput } from '../../components/forms/labeled-input';
 import {
   Chip,
   Label,
   MultilineInput,
+  NoteText,
   PrimaryButton,
   Row,
   ScreenContainer,
   ScreenTitle,
 } from '../../components/ui/primitives';
-import { toDateInput, toTimeInput } from '../../lib/date';
+import { createDefaultLogEventValues, type LogEventFormValues, validateLogEventForm } from '../../lib/validations';
 import { useAppState } from '../app/app-context';
+
+function wait(ms: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export function LogEventScreen() {
   const router = useRouter();
-  const { saveEvent, user } = useAppState();
+  const { colors, saveEvent, user } = useAppState();
+  const [formValues, setFormValues] = useState<LogEventFormValues>(() =>
+    createDefaultLogEventValues(user?.relationshipMode === 'linked'),
+  );
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success'>('idle');
 
-  const [eventType, setEventType] = useState<'solo' | 'partnered'>('partnered');
-  const [partnerName, setPartnerName] = useState('');
-  const [date, setDate] = useState(toDateInput(new Date()));
-  const [time, setTime] = useState(toTimeInput(new Date()));
-  const [durationMinutes, setDurationMinutes] = useState('45');
-  const [location, setLocation] = useState('Home');
-  const [overallRating, setOverallRating] = useState('4');
-  const [emotionalRating, setEmotionalRating] = useState('4');
-  const [notes, setNotes] = useState('');
-  const [positions, setPositions] = useState('');
-  const [whatWorkedWell, setWhatWorkedWell] = useState('');
-  const [whatToTryNext, setWhatToTryNext] = useState('');
-  const [isSharedWithPartner, setIsSharedWithPartner] = useState(user?.relationshipMode === 'linked');
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        errorText: {
+          color: colors.danger,
+          fontSize: 13,
+          lineHeight: 18,
+        },
+        successText: {
+          color: colors.accentText,
+          fontSize: 13,
+          lineHeight: 18,
+        },
+      }),
+    [colors.accentText, colors.danger],
+  );
+
+  const setField = <K extends keyof LogEventFormValues>(field: K, value: LogEventFormValues[K]) => {
+    setFormValues((previous) => ({ ...previous, [field]: value }));
+  };
+
+  const saveButtonLabel = saveStatus === 'saving' ? 'Saving...' : saveStatus === 'success' ? 'Saved' : 'Save event';
+
+  const onSave = async () => {
+    if (saveStatus === 'saving') return;
+
+    setErrorMessage(null);
+
+    const parsed = validateLogEventForm(formValues, {
+      ownerUserId: user?.email,
+    });
+
+    if (!parsed.success) {
+      setSaveStatus('idle');
+      setErrorMessage(parsed.issues[0]?.message ?? 'Please review the form and try again.');
+      return;
+    }
+
+    try {
+      setSaveStatus('saving');
+      const saved = await saveEvent(parsed.data);
+      setSaveStatus('success');
+      await wait(650);
+      router.replace(`/events/${saved.id}`);
+    } catch {
+      setSaveStatus('idle');
+      Alert.alert('Unable to save', 'Please try again.');
+    }
+  };
 
   return (
     <ScreenContainer>
-      <ScreenTitle title="Log Event" subtitle="Quick private reflection" />
+      <ScreenTitle title="Log Event" subtitle="Private shared-experience reflection" />
 
       <Label>Event type</Label>
       <Row>
-        <Chip label="Partnered" active={eventType === 'partnered'} onPress={() => setEventType('partnered')} />
-        <Chip label="Solo" active={eventType === 'solo'} onPress={() => setEventType('solo')} />
+        <Chip label="Partnered" active={formValues.eventType === 'partnered'} onPress={() => setField('eventType', 'partnered')} />
+        <Chip label="Solo" active={formValues.eventType === 'solo'} onPress={() => setField('eventType', 'solo')} />
       </Row>
 
-      {eventType === 'partnered' ? (
+      {formValues.eventType === 'partnered' ? (
         <LabeledInput
-          label="Partner display name"
-          value={partnerName}
-          onChangeText={setPartnerName}
+          label="Partner name"
+          value={formValues.partnerName}
+          onChangeText={(value) => setField('partnerName', value)}
           placeholder="Partner name"
         />
       ) : null}
 
       <LabeledInput
-        label="Date (YYYY-MM-DD)"
-        value={date}
-        onChangeText={setDate}
+        label="Start date (YYYY-MM-DD)"
+        value={formValues.startDate}
+        onChangeText={(value) => setField('startDate', value)}
         autoCapitalize="none"
         placeholder="2026-03-14"
       />
       <LabeledInput
         label="Start time (HH:MM)"
-        value={time}
-        onChangeText={setTime}
+        value={formValues.startTime}
+        onChangeText={(value) => setField('startTime', value)}
         autoCapitalize="none"
         placeholder="21:30"
       />
+
+      <Label>End time (optional)</Label>
+      <NoteText>Set both end date and end time, or leave both empty and provide duration.</NoteText>
       <LabeledInput
-        label="Duration (minutes)"
-        value={durationMinutes}
-        onChangeText={setDurationMinutes}
+        label="End date (YYYY-MM-DD)"
+        value={formValues.endDate}
+        onChangeText={(value) => setField('endDate', value)}
+        autoCapitalize="none"
+        placeholder="2026-03-14"
+      />
+      <LabeledInput
+        label="End time (HH:MM)"
+        value={formValues.endTime}
+        onChangeText={(value) => setField('endTime', value)}
+        autoCapitalize="none"
+        placeholder="22:15"
+      />
+      <LabeledInput
+        label="Duration in minutes (used when end time is empty)"
+        value={formValues.durationMinutes}
+        onChangeText={(value) => setField('durationMinutes', value)}
         keyboardType="number-pad"
       />
-      <LabeledInput label="Location" value={location} onChangeText={setLocation} />
+      <LabeledInput label="Location" value={formValues.location} onChangeText={(value) => setField('location', value)} />
       <LabeledInput
         label="Overall rating (1-5)"
-        value={overallRating}
-        onChangeText={setOverallRating}
+        value={formValues.overallRating}
+        onChangeText={(value) => setField('overallRating', value)}
         keyboardType="number-pad"
       />
       <LabeledInput
         label="Emotional rating (1-5)"
-        value={emotionalRating}
-        onChangeText={setEmotionalRating}
+        value={formValues.emotionalRating}
+        onChangeText={(value) => setField('emotionalRating', value)}
         keyboardType="number-pad"
       />
 
       <Label>Notes</Label>
-      <MultilineInput
-        value={notes}
-        onChangeText={setNotes}
-        placeholder="Private reflection"
-      />
+      <MultilineInput value={formValues.notes} onChangeText={(value) => setField('notes', value)} placeholder="Private reflection" />
 
       <LabeledInput
         label="Positions / activities"
-        value={positions}
-        onChangeText={setPositions}
+        value={formValues.positions}
+        onChangeText={(value) => setField('positions', value)}
         placeholder="Optional"
       />
-      <LabeledInput label="What worked well" value={whatWorkedWell} onChangeText={setWhatWorkedWell} />
-      <LabeledInput label="What to try next" value={whatToTryNext} onChangeText={setWhatToTryNext} />
+      <LabeledInput
+        label="Toys used"
+        value={formValues.toysUsed}
+        onChangeText={(value) => setField('toysUsed', value)}
+        placeholder="Optional"
+      />
+      <LabeledInput
+        label="What worked well"
+        value={formValues.whatWorkedWell}
+        onChangeText={(value) => setField('whatWorkedWell', value)}
+      />
+      <LabeledInput
+        label="What to try next"
+        value={formValues.whatToTryNext}
+        onChangeText={(value) => setField('whatToTryNext', value)}
+      />
 
       <Row>
         <Chip
-          label={isSharedWithPartner ? 'Shared with partner' : 'Private only'}
-          active={isSharedWithPartner}
-          onPress={() => setIsSharedWithPartner((previous) => !previous)}
+          label={formValues.isSharedWithPartner ? 'Shared with partner' : 'Private only'}
+          active={formValues.isSharedWithPartner}
+          onPress={() => setField('isSharedWithPartner', !formValues.isSharedWithPartner)}
         />
       </Row>
 
-      <PrimaryButton
-        label="Save event"
-        onPress={async () => {
-          const dateTimeStart = `${date.trim()}T${time.trim()}:00`;
-          if (Number.isNaN(+new Date(dateTimeStart))) {
-            Alert.alert('Invalid date/time', 'Use YYYY-MM-DD and HH:MM values.');
-            return;
-          }
+      {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
+      {saveStatus === 'success' ? <Text style={styles.successText}>Saved securely. Opening event details...</Text> : null}
 
-          const parsedDuration = Number.parseInt(durationMinutes, 10);
-          const parsedOverall = Number.parseInt(overallRating, 10);
-          const parsedEmotional = Number.parseInt(emotionalRating, 10);
-
-          if (!parsedDuration || parsedDuration < 1) {
-            Alert.alert('Invalid duration', 'Duration must be at least 1 minute.');
-            return;
-          }
-
-          if (parsedOverall < 1 || parsedOverall > 5 || parsedEmotional < 1 || parsedEmotional > 5) {
-            Alert.alert('Invalid rating', 'Ratings must be between 1 and 5.');
-            return;
-          }
-
-          await saveEvent({
-            eventType,
-            partnerDisplayNameSnapshot: eventType === 'partnered' ? partnerName.trim() || 'Partner' : undefined,
-            dateTimeStart,
-            durationMinutes: parsedDuration,
-            location: location.trim(),
-            overallRating: parsedOverall,
-            emotionalRating: parsedEmotional,
-            notes: notes.trim(),
-            positions: positions.trim(),
-            whatWorkedWell: whatWorkedWell.trim(),
-            whatToTryNext: whatToTryNext.trim(),
-            isSharedWithPartner,
-          });
-
-          setPartnerName('');
-          setNotes('');
-          setPositions('');
-          setWhatWorkedWell('');
-          setWhatToTryNext('');
-          router.replace('/(tabs)');
-        }}
-      />
+      <PrimaryButton label={saveButtonLabel} onPress={() => void onSave()} />
     </ScreenContainer>
   );
 }

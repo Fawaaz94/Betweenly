@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../constants/theme';
+import type { ThemeColors } from '../../constants/theme';
 import { createMonthMatrix, toDateInput } from '../../lib/date';
 import type { IntimacyEvent } from '../../types/models';
+import { useAppState } from '../../features/app/app-context';
 
 export function MonthCalendar({
   year,
@@ -16,6 +18,9 @@ export function MonthCalendar({
   events: IntimacyEvent[];
   onSelectDate: (date: string) => void;
 }) {
+  const { colors } = useAppState();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const matrix = createMonthMatrix(year, month);
   const eventsByDay = new Set(events.map((event) => event.dateTimeStart.slice(0, 10)));
 
@@ -57,47 +62,49 @@ export function MonthCalendar({
   );
 }
 
-const styles = StyleSheet.create({
-  weekHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  weekHeaderText: {
-    flex: 1,
-    textAlign: 'center',
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  calendarWeekRow: {
-    flexDirection: 'row',
-    marginTop: 4,
-  },
-  calendarCell: {
-    flex: 1,
-    minHeight: 44,
-    borderWidth: 1,
-    borderColor: colors.borderMuted,
-    borderRadius: 8,
-    margin: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  calendarCellSelected: {
-    borderColor: colors.accent,
-    backgroundColor: '#172554',
-  },
-  calendarDate: {
-    color: colors.textPrimary,
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  dot: {
-    marginTop: 3,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.accent,
-  },
-});
+function createStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    weekHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 8,
+    },
+    weekHeaderText: {
+      flex: 1,
+      textAlign: 'center',
+      color: colors.textMuted,
+      fontSize: 12,
+    },
+    calendarWeekRow: {
+      flexDirection: 'row',
+      marginTop: 4,
+    },
+    calendarCell: {
+      flex: 1,
+      minHeight: 44,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+      borderRadius: 8,
+      margin: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+    },
+    calendarCellSelected: {
+      borderColor: colors.accent,
+      backgroundColor: colors.selectedSurface,
+    },
+    calendarDate: {
+      color: colors.textPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    dot: {
+      marginTop: 3,
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.accent,
+    },
+  });
+}

@@ -1,29 +1,29 @@
 import { Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../src/constants/theme';
 import { AppProvider } from '../src/features/app/app-context';
+import { useTheme } from '../src/theme/use-theme';
+
+function AppShell() {
+  const { colors } = useTheme();
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.appBg }} edges={['top', 'left', 'right']}>
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: colors.appBg },
+        }}
+      />
+    </SafeAreaView>
+  );
+}
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <SafeAreaView style={styles.root} edges={['top', 'left', 'right']}>
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: colors.appBg },
-            }}
-          />
-        </SafeAreaView>
+        <AppShell />
       </AppProvider>
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.appBg,
-  },
-});

@@ -6,7 +6,7 @@ export function EditProfileScreen() {
 
   return (
     <ScreenContainer>
-      <ScreenTitle title="Edit profile" subtitle="Update your private profile details" />
+      <ScreenTitle title="Edit profile" subtitle="Update your private profile details" showBackButton />
       <NoteText>Profile editing fields will be added here in the next iteration.</NoteText>
       <GhostButton label="Close" onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/profile'))} />
     </ScreenContainer>

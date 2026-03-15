@@ -1,4 +1,6 @@
 import { useMemo, type PropsWithChildren } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter, type Href } from 'expo-router';
 import {
   Pressable,
   ScrollView,
@@ -27,11 +29,35 @@ export function ScreenContainer({ children }: PropsWithChildren) {
   );
 }
 
-export function ScreenTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+type ScreenTitleProps = {
+  title: string;
+  subtitle?: string;
+  showBackButton?: boolean;
+  backFallbackHref?: Href;
+};
+
+export function ScreenTitle({ title, subtitle, showBackButton = false, backFallbackHref = '/(tabs)/profile' }: ScreenTitleProps) {
   const styles = useThemedStyles();
+  const { colors, theme } = useTheme();
+  const router = useRouter();
+  const canGoBack = showBackButton && router.canGoBack();
+
+  const handleBack = () => {
+    if (canGoBack) {
+      router.back();
+      return;
+    }
+
+    router.replace(backFallbackHref);
+  };
 
   return (
     <View style={styles.titleWrap}>
+      {showBackButton ? (
+        <Pressable onPress={handleBack} style={({ pressed }) => [styles.backButton, pressed ? styles.backButtonPressed : null]}>
+          <Ionicons name="chevron-back" size={theme.sizing.iconMd} color={colors.textPrimary} />
+        </Pressable>
+      ) : null}
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
@@ -170,6 +196,20 @@ function createStyles(theme: Theme, colors: ThemeColors) {
       marginTop: theme.spacing.sm,
       marginBottom: theme.spacing.xs + 2,
       gap: theme.spacing.xs,
+    },
+    backButton: {
+      width: 36,
+      height: 36,
+      borderRadius: theme.radius.pill,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.xs,
+    },
+    backButtonPressed: {
+      backgroundColor: colors.surfaceAlt,
     },
     title: {
       color: colors.textPrimary,

@@ -118,10 +118,10 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profile',
+            title: 'Settings',
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
-                name={focused ? 'person' : 'person-outline'}
+                name={focused ? 'settings' : 'settings-outline'}
                 size={theme.sizing.iconMd}
                 color={color}
               />

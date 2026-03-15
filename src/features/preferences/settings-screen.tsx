@@ -6,9 +6,9 @@ export function SettingsScreen() {
 
   return (
     <ScreenContainer>
-      <ScreenTitle title="Settings" subtitle="App behavior and appearance" />
+      <ScreenTitle title="Settings" subtitle="App behavior and appearance" showBackButton />
 
-      <StatRow label="Theme" value={themeMode === 'dark' ? 'Dark' : 'Light'} />
+
 
       <Row>
         <Chip label="Light mode" active={themeMode === 'light'} onPress={() => void setThemeMode('light')} />

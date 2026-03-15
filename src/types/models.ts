@@ -44,3 +44,19 @@ export type UpdateIntimacyEventInput = Partial<CreateIntimacyEventInput>;
 
 export type CreateEventInput = CreateIntimacyEventInput;
 export type UpdateEventInput = UpdateIntimacyEventInput;
+
+export type Partner = {
+  id: string;
+  name: string;
+  birthday: string | null;
+  nationality: string;
+  instagram: string;
+  notes: string;
+  phoneNumber: string;
+  avatarUri: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePartnerInput = Omit<Partner, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdatePartnerInput = Partial<CreatePartnerInput>;

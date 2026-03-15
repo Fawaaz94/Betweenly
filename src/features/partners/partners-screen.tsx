@@ -1,59 +1,106 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { ScreenContainer, ScreenTitle } from '../../components/ui/primitives';
+import { Alert, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { countryCodeToFlagEmoji } from '../../constants/countries';
+import { EmptyText, NoteText, ScreenContainer, ScreenTitle } from '../../components/ui/primitives';
 import { useTheme } from '../../theme/use-theme';
+import { useAppState } from '../app/app-context';
 
-type SortKey = 'name' | 'entries' | 'age' | 'custom';
+function toWhatsAppUrl(phoneNumber: string) {
+  const digits = phoneNumber.replace(/[^\d]/g, '');
+  if (digits.length < 6) return null;
+  return `https://wa.me/${digits}`;
+}
 
-type PartnerListItem = {
-  id: string;
-  name: string;
-  age: number;
-  entries: number;
-  custom: string;
-};
+function toInstagramUrl(handle: string) {
+  const cleaned = handle.trim();
+  if (!cleaned) return null;
+  if (cleaned.startsWith('http://') || cleaned.startsWith('https://')) return cleaned;
+  return `https://instagram.com/${cleaned.replace(/^@+/, '')}`;
+}
 
-const SORT_OPTIONS: Array<{ key: SortKey; label: string }> = [
-  { key: 'name', label: 'Name' },
-  { key: 'entries', label: 'Entries' },
-  { key: 'age', label: 'Age' },
-  { key: 'custom', label: 'Custom' },
-];
+function formatBirthday(birthday: string | null) {
+  if (!birthday) return 'Birthday not set';
+  const date = new Date(`${birthday}T00:00:00`);
+  if (Number.isNaN(+date)) return birthday;
+  return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
-const PARTNERS: PartnerListItem[] = [
-  {
-    id: 'partner_1',
-    name: 'Lexi',
-    age: 26,
-    entries: 1,
-    custom: 'Trusted',
-  },
-];
+function getAgeFromBirthday(birthday: string | null) {
+  if (!birthday) return null;
+  const date = new Date(`${birthday}T00:00:00`);
+  if (Number.isNaN(+date)) return null;
 
-function sortPartners(items: PartnerListItem[], sortBy: SortKey): PartnerListItem[] {
-  const list = [...items];
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const hasBirthdayPassedThisYear =
+    now.getMonth() > date.getMonth() || (now.getMonth() === date.getMonth() && now.getDate() >= date.getDate());
+  if (!hasBirthdayPassedThisYear) age -= 1;
+  return age >= 0 ? age : null;
+}
 
-  switch (sortBy) {
-    case 'name':
-      return list.sort((a, b) => a.name.localeCompare(b.name));
-    case 'age':
-      return list.sort((a, b) => a.age - b.age);
-    case 'custom':
-      return list.sort((a, b) => a.custom.localeCompare(b.custom));
-    case 'entries':
-    default:
-      return list.sort((a, b) => b.entries - a.entries);
-  }
+function formatMonthLabel(monthKey: string) {
+  const date = new Date(`${monthKey}-01T00:00:00`);
+  if (Number.isNaN(+date)) return monthKey;
+  return date.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function formatEventDateTime(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(+date)) return iso;
+  return date.toLocaleDateString(undefined, {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 export function PartnersScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const [sortBy, setSortBy] = useState<SortKey>('entries');
+  const { partners, events } = useAppState();
+  const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+  const [entriesModalVisible, setEntriesModalVisible] = useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<'all' | string>('all');
 
-  const partners = useMemo(() => sortPartners(PARTNERS, sortBy), [sortBy]);
+  const selectedPartner = useMemo(
+    () => partners.find((partner) => partner.id === selectedPartnerId) ?? null,
+    [partners, selectedPartnerId],
+  );
+
+  const entryCountByPartnerName = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const event of events) {
+      const key = (event.partnerName ?? '').trim().toLowerCase();
+      if (!key) continue;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    return counts;
+  }, [events]);
+
+  const selectedPartnerEvents = useMemo(() => {
+    if (!selectedPartner) return [];
+    const partnerName = selectedPartner.name.trim().toLowerCase();
+    return events
+      .filter((event) => (event.partnerName ?? '').trim().toLowerCase() === partnerName)
+      .sort((a, b) => +new Date(b.dateTimeStart) - +new Date(a.dateTimeStart));
+  }, [events, selectedPartner]);
+
+  const monthKeys = useMemo(() => {
+    const unique = new Set<string>();
+    for (const event of selectedPartnerEvents) {
+      unique.add(event.dateTimeStart.slice(0, 7));
+    }
+    return Array.from(unique).sort((a, b) => (a > b ? -1 : 1));
+  }, [selectedPartnerEvents]);
+
+  const filteredEntries = useMemo(() => {
+    if (selectedMonth === 'all') return selectedPartnerEvents;
+    return selectedPartnerEvents.filter((event) => event.dateTimeStart.startsWith(selectedMonth));
+  }, [selectedMonth, selectedPartnerEvents]);
 
   const styles = useMemo(
     () =>
@@ -77,38 +124,6 @@ export function PartnersScreen() {
         addButtonPressed: {
           backgroundColor: colors.surfaceAlt,
         },
-        segmentedWrap: {
-          marginTop: theme.spacing.sm,
-          backgroundColor: colors.surfaceAlt,
-          borderRadius: theme.radius.pill,
-          borderWidth: 1,
-          borderColor: colors.borderMuted,
-          padding: theme.spacing.xs,
-          flexDirection: 'row',
-          gap: theme.spacing.xs,
-        },
-        segmentButton: {
-          flex: 1,
-          minHeight: 34,
-          borderRadius: theme.radius.pill,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        segmentButtonActive: {
-          backgroundColor: colors.surface,
-          borderWidth: 1,
-          borderColor: colors.borderMuted,
-        },
-        segmentText: {
-          color: colors.textSecondary,
-          fontSize: theme.typography.fontSize.sm,
-          lineHeight: theme.typography.lineHeight.sm,
-          fontWeight: '500',
-        },
-        segmentTextActive: {
-          color: colors.textPrimary,
-          fontWeight: '600',
-        },
         listCard: {
           marginTop: theme.spacing.md,
           backgroundColor: colors.surface,
@@ -120,6 +135,7 @@ export function PartnersScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
+          gap: theme.spacing.sm,
         },
         listCardPressed: {
           backgroundColor: colors.surfaceAlt,
@@ -128,35 +144,28 @@ export function PartnersScreen() {
           flexDirection: 'row',
           alignItems: 'center',
           gap: theme.spacing.sm,
+          flex: 1,
         },
         avatarWrap: {
-          width: 50,
-          height: 50,
-          borderRadius: 25,
+          width: 56,
+          height: 56,
+          borderRadius: 28,
           backgroundColor: colors.surfaceAlt,
           borderWidth: 1,
           borderColor: colors.borderMuted,
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
+        },
+        avatarImage: {
+          width: '100%',
+          height: '100%',
         },
         avatarText: {
           color: colors.textPrimary,
-          fontSize: theme.typography.fontSize.md,
-          lineHeight: theme.typography.lineHeight.md,
+          fontSize: theme.typography.fontSize.lg,
+          lineHeight: theme.typography.lineHeight.lg,
           fontWeight: '700',
-        },
-        verificationDot: {
-          position: 'absolute',
-          right: -4,
-          bottom: -4,
-          width: 18,
-          height: 18,
-          borderRadius: 9,
-          backgroundColor: colors.accent,
-          borderWidth: 2,
-          borderColor: colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
         },
         partnerName: {
           color: colors.textPrimary,
@@ -174,15 +183,266 @@ export function PartnersScreen() {
           alignItems: 'center',
           gap: theme.spacing.xs,
         },
-        entriesText: {
+        entryCount: {
           color: colors.textMuted,
           fontSize: theme.typography.fontSize.md,
           lineHeight: theme.typography.lineHeight.md,
           fontWeight: '500',
         },
-        footerHint: {
-          textAlign: 'center',
+        modalBackdrop: {
+          flex: 1,
+          justifyContent: 'flex-end',
+          backgroundColor: 'rgba(0,0,0,0.32)',
+        },
+        modalSheet: {
+          backgroundColor: colors.appBg,
+          borderTopLeftRadius: theme.radius.xxl,
+          borderTopRightRadius: theme.radius.xxl,
+          paddingHorizontal: theme.spacing.lg,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing.xxl,
+          gap: theme.spacing.md,
+          minHeight: '72%',
+        },
+        entriesSheet: {
+          backgroundColor: colors.appBg,
+          borderTopLeftRadius: theme.radius.xxl,
+          borderTopRightRadius: theme.radius.xxl,
+          paddingHorizontal: theme.spacing.lg,
+          paddingTop: theme.spacing.md,
+          paddingBottom: theme.spacing.xxl,
+          minHeight: '72%',
+        },
+        modalHandle: {
+          alignSelf: 'center',
+          width: 42,
+          height: 4,
+          borderRadius: 2,
+          backgroundColor: colors.borderMuted,
+          marginBottom: theme.spacing.md,
+        },
+        modalHeader: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        modalIconButton: {
+          width: 38,
+          height: 38,
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        modalActionButton: {
+          minWidth: 56,
+          height: 38,
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: theme.spacing.sm,
+        },
+        modalActionText: {
+          color: colors.accent,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '700',
+        },
+        modalTitle: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.lg,
+          lineHeight: theme.typography.lineHeight.lg,
+          fontWeight: '700',
+        },
+        profileWrap: {
+          alignItems: 'center',
+          gap: theme.spacing.xs,
+          marginTop: theme.spacing.sm,
+        },
+        modalAvatar: {
+          width: 96,
+          height: 96,
+          borderRadius: 48,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+        },
+        modalName: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.xl,
+          lineHeight: theme.typography.lineHeight.xl,
+          fontWeight: '700',
+        },
+        modalSub: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+        },
+        profileMetaRow: {
+          width: '100%',
+          flexDirection: 'row',
+          alignItems: 'stretch',
+          gap: theme.spacing.xs,
+          marginTop: theme.spacing.xs,
+        },
+        profileMetaCard: {
+          flex: 1,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          borderRadius: theme.radius.md,
+          backgroundColor: colors.surface,
+          paddingHorizontal: theme.spacing.sm,
+          paddingVertical: theme.spacing.xs,
+          gap: 2,
+        },
+        profileMetaLabel: {
+          color: colors.textMuted,
+          fontSize: theme.typography.fontSize.xs,
+          lineHeight: theme.typography.lineHeight.xs,
+          fontWeight: '600',
+        },
+        profileMetaValue: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
+        },
+        flagCard: {
+          width: 60,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          borderRadius: theme.radius.md,
+          backgroundColor: colors.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        flagText: {
+          fontSize: theme.typography.fontSize.xxl,
+          lineHeight: theme.typography.lineHeight.xxl,
+        },
+        sectionCard: {
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          borderRadius: theme.radius.lg,
+          overflow: 'hidden',
+        },
+        sectionRow: {
+          minHeight: theme.sizing.buttonHeight + 16,
+          paddingHorizontal: theme.spacing.md,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        sectionRowLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+          flex: 1,
+        },
+        sectionTextBlock: {
+          flex: 1,
+          gap: 2,
+        },
+        sectionLabel: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.md,
+          lineHeight: theme.typography.lineHeight.md,
+          fontWeight: '500',
+        },
+        sectionValue: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          maxWidth: '55%',
+          textAlign: 'right',
+        },
+        sectionSubValue: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+        },
+        noteText: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+        },
+        entriesMetaRow: {
           marginTop: theme.spacing.md,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        },
+        monthFilters: {
+          marginTop: theme.spacing.sm,
+          marginBottom: theme.spacing.md,
+          flexGrow: 0,
+        },
+        monthChip: {
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surface,
+          borderRadius: theme.radius.pill,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.xs,
+          marginRight: theme.spacing.xs,
+        },
+        monthChipActive: {
+          backgroundColor: colors.accent,
+          borderColor: colors.accentPressed,
+        },
+        monthChipText: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
+        },
+        monthChipTextActive: {
+          color: colors.textOnAccent,
+        },
+        entriesHeaderLabel: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
+        },
+        entriesHeaderValue: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.md,
+          lineHeight: theme.typography.lineHeight.md,
+          fontWeight: '700',
+        },
+        entryRow: {
+          minHeight: theme.sizing.buttonHeight + 10,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderBottomWidth: 1,
+          borderBottomColor: colors.borderMuted,
+        },
+        entryLeft: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.sm,
+          flex: 1,
+        },
+        entryTitle: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.md,
+          lineHeight: theme.typography.lineHeight.md,
+          fontWeight: '600',
+        },
+        entryMeta: {
           color: colors.textSecondary,
           fontSize: theme.typography.fontSize.sm,
           lineHeight: theme.typography.lineHeight.sm,
@@ -191,6 +451,41 @@ export function PartnersScreen() {
     [colors, theme],
   );
 
+  const openInstagram = async (handle: string) => {
+    const url = toInstagramUrl(handle);
+    if (!url) {
+      Alert.alert('No Instagram', 'No Instagram handle has been saved.');
+      return;
+    }
+
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'Instagram cannot be opened on this device.');
+      return;
+    }
+
+    await Linking.openURL(url);
+  };
+
+  const openWhatsApp = async (phoneNumber: string) => {
+    const url = toWhatsAppUrl(phoneNumber);
+    if (!url) {
+      Alert.alert('No phone number', 'No valid phone number has been saved.');
+      return;
+    }
+
+    const canOpen = await Linking.canOpenURL(url);
+    if (!canOpen) {
+      Alert.alert('Unavailable', 'WhatsApp is not available on this device.');
+      return;
+    }
+
+    await Linking.openURL(url);
+  };
+
+  const selectedPartnerFlag = countryCodeToFlagEmoji(selectedPartner?.nationality ?? '');
+  const selectedPartnerAge = getAgeFromBirthday(selectedPartner?.birthday ?? null);
+
   return (
     <ScreenContainer>
       <View style={styles.headerWrap}>
@@ -198,56 +493,257 @@ export function PartnersScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Add partner"
-          onPress={() => router.push('/partner/link')}
+          onPress={() => router.push('/partner/new')}
           style={({ pressed }) => [styles.addButton, pressed ? styles.addButtonPressed : null]}
         >
           <Ionicons name="add" size={theme.sizing.iconLg} color={colors.accent} />
         </Pressable>
       </View>
 
-      <View style={styles.segmentedWrap}>
-        {SORT_OPTIONS.map((option) => {
-          const active = sortBy === option.key;
-          return (
-            <Pressable
-              key={option.key}
-              onPress={() => setSortBy(option.key)}
-              style={[styles.segmentButton, active ? styles.segmentButtonActive : null]}
-            >
-              <Text style={[styles.segmentText, active ? styles.segmentTextActive : null]}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {partners.map((partner) => (
-        <Pressable
-          key={partner.id}
-          style={({ pressed }) => [styles.listCard, pressed ? styles.listCardPressed : null]}
-          onLongPress={() => Alert.alert('Partner options', `More options for ${partner.name} will be added soon.`)}
-          onPress={() => Alert.alert(partner.name, `${partner.entries} logged entries`)}
-        >
-          <View style={styles.partnerLeft}>
-            <View style={styles.avatarWrap}>
-              <Text style={styles.avatarText}>{partner.name.slice(0, 1).toUpperCase()}</Text>
-              <View style={styles.verificationDot}>
-                <Ionicons name="checkmark" size={10} color={colors.textOnAccent} />
+      {partners.map((partner) => {
+        const entryCount = entryCountByPartnerName.get(partner.name.trim().toLowerCase()) ?? 0;
+        return (
+          <Pressable
+            key={partner.id}
+            style={({ pressed }) => [styles.listCard, pressed ? styles.listCardPressed : null]}
+            onPress={() => {
+              setSelectedMonth('all');
+              setEntriesModalVisible(false);
+              setSelectedPartnerId(partner.id);
+            }}
+          >
+            <View style={styles.partnerLeft}>
+              <View style={styles.avatarWrap}>
+                {partner.avatarUri ? (
+                  <Image source={{ uri: partner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+                ) : (
+                  <Text style={styles.avatarText}>{partner.name.slice(0, 1).toUpperCase()}</Text>
+                )}
+              </View>
+              <View>
+                <Text style={styles.partnerName}>
+                  {`${partner.name} ${countryCodeToFlagEmoji(partner.nationality)}`}
+                </Text>
+                <Text style={styles.partnerMeta}>{partner.birthday ? formatBirthday(partner.birthday) : 'Birthday not set'}</Text>
               </View>
             </View>
-            <View>
-              <Text style={styles.partnerName}>{partner.name}</Text>
-              <Text style={styles.partnerMeta}>{partner.age}y</Text>
+
+            <View style={styles.partnerRight}>
+              <Text style={styles.entryCount}>{entryCount}x</Text>
+              <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
             </View>
-          </View>
+          </Pressable>
+        );
+      })}
 
-          <View style={styles.partnerRight}>
-            <Text style={styles.entriesText}>{partner.entries}x</Text>
-            <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
-          </View>
-        </Pressable>
-      ))}
+      {partners.length === 0 ? <EmptyText>No partners added yet. Tap + to add your first partner.</EmptyText> : null}
+      <NoteText>Tap a partner to view details, links, and entries.</NoteText>
 
-      <Text style={styles.footerHint}>Long press partner for more options</Text>
+      <Modal visible={Boolean(selectedPartner)} animationType="slide" transparent onRequestClose={() => setSelectedPartnerId(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+
+            {selectedPartner ? (
+              <>
+                <View style={styles.modalHeader}>
+                  <Pressable
+                    style={styles.modalIconButton}
+                    onPress={() => {
+                      setEntriesModalVisible(false);
+                      setSelectedPartnerId(null);
+                    }}
+                  >
+                    <Ionicons name="close" size={theme.sizing.iconMd} color={colors.textPrimary} />
+                  </Pressable>
+                  <Text style={styles.modalTitle}>Partner</Text>
+                  <Pressable
+                    style={styles.modalActionButton}
+                    onPress={() => {
+                      const partnerId = selectedPartner.id;
+                      setEntriesModalVisible(false);
+                      setSelectedPartnerId(null);
+                      router.push({ pathname: '/partner/[id]', params: { id: partnerId } });
+                    }}
+                  >
+                    <Text style={styles.modalActionText}>Edit</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.profileWrap}>
+                  <View style={styles.modalAvatar}>
+                    {selectedPartner.avatarUri ? (
+                      <Image source={{ uri: selectedPartner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+                    ) : (
+                      <Text style={styles.avatarText}>{selectedPartner.name.slice(0, 1).toUpperCase()}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.modalName}>
+                    {`${selectedPartner.name} ${selectedPartnerFlag}`}
+                  </Text>
+                </View>
+
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionRow}>
+                    <View style={styles.sectionRowLeft}>
+                      <Ionicons name="gift-outline" size={theme.sizing.iconMd} color={colors.textSecondary} />
+                      <View style={styles.sectionTextBlock}>
+                        <Text style={styles.sectionLabel}>Birthday</Text>
+                        <Text style={styles.sectionSubValue}>
+                          {selectedPartnerAge !== null
+                            ? `${formatBirthday(selectedPartner.birthday)} (${selectedPartnerAge}y)`
+                            : formatBirthday(selectedPartner.birthday)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  <Pressable
+                    style={styles.sectionRow}
+                    onPress={() => {
+                      setSelectedMonth('all');
+                      setEntriesModalVisible(true);
+                    }}
+                  >
+                    <View style={styles.sectionRowLeft}>
+                      <Ionicons name="list-outline" size={theme.sizing.iconMd} color={colors.textSecondary} />
+                      <View style={styles.sectionTextBlock}>
+                        <Text style={styles.sectionLabel}>Entries</Text>
+                        <Text style={styles.sectionSubValue}>{selectedPartnerEvents.length}x</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.sectionCard}>
+                  <Pressable style={styles.sectionRow} onPress={() => void openInstagram(selectedPartner.instagram)}>
+                    <View style={styles.sectionRowLeft}>
+                      <Ionicons name="logo-instagram" size={theme.sizing.iconMd} color={colors.textSecondary} />
+                      <View style={styles.sectionTextBlock}>
+                        <Text style={styles.sectionLabel}>Instagram</Text>
+                        <Text style={styles.sectionSubValue}>{selectedPartner.instagram || 'Not set'}</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
+                  </Pressable>
+                  <Pressable style={styles.sectionRow} onPress={() => void openWhatsApp(selectedPartner.phoneNumber)}>
+                    <View style={styles.sectionRowLeft}>
+                      <Ionicons name="logo-whatsapp" size={theme.sizing.iconMd} color={colors.textSecondary} />
+                      <View style={styles.sectionTextBlock}>
+                        <Text style={styles.sectionLabel}>WhatsApp</Text>
+                        <Text style={styles.sectionSubValue}>{selectedPartner.phoneNumber || 'Not set'}</Text>
+                      </View>
+                    </View>
+                    <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionRow}>
+                    <View style={styles.sectionRowLeft}>
+                      <Ionicons name="document-text-outline" size={theme.sizing.iconMd} color={colors.textSecondary} />
+                      <View style={styles.sectionTextBlock}>
+                        <Text style={styles.sectionLabel}>Notes</Text>
+                        <Text style={styles.sectionSubValue}>{selectedPartner.notes || 'No notes'}</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={entriesModalVisible} animationType="slide" transparent onRequestClose={() => setEntriesModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.entriesSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalHeader}>
+              <Pressable style={styles.modalIconButton} onPress={() => setEntriesModalVisible(false)}>
+                <Ionicons name="close" size={theme.sizing.iconMd} color={colors.textPrimary} />
+              </Pressable>
+              <Text style={styles.modalTitle}>Entries</Text>
+              <View style={styles.modalIconButton}>
+                <Ionicons name="calendar-outline" size={theme.sizing.iconMd} color={colors.textSecondary} />
+              </View>
+            </View>
+
+            {selectedPartner ? (
+              <>
+                <View style={styles.profileWrap}>
+                  <View style={styles.modalAvatar}>
+                    {selectedPartner.avatarUri ? (
+                      <Image source={{ uri: selectedPartner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+                    ) : (
+                      <Text style={styles.avatarText}>{selectedPartner.name.slice(0, 1).toUpperCase()}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.modalName}>
+                    {`${selectedPartner.name} ${selectedPartnerFlag}`}
+                  </Text>
+                </View>
+
+                <View style={styles.entriesMetaRow}>
+                  <Text style={styles.entriesHeaderLabel}>Month filter</Text>
+                  <Text style={styles.entriesHeaderValue}>Total: {filteredEntries.length}</Text>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.monthFilters}>
+                  <Pressable
+                    onPress={() => setSelectedMonth('all')}
+                    style={[styles.monthChip, selectedMonth === 'all' ? styles.monthChipActive : null]}
+                  >
+                    <Text style={[styles.monthChipText, selectedMonth === 'all' ? styles.monthChipTextActive : null]}>All</Text>
+                  </Pressable>
+                  {monthKeys.map((key) => (
+                    <Pressable
+                      key={key}
+                      onPress={() => setSelectedMonth(key)}
+                      style={[styles.monthChip, selectedMonth === key ? styles.monthChipActive : null]}
+                    >
+                      <Text style={[styles.monthChipText, selectedMonth === key ? styles.monthChipTextActive : null]}>
+                        {formatMonthLabel(key)}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+
+                <View style={styles.sectionCard}>
+                  {filteredEntries.map((entry) => (
+                    <Pressable
+                      key={entry.id}
+                      style={styles.entryRow}
+                      onPress={() => {
+                        setEntriesModalVisible(false);
+                        setSelectedPartnerId(null);
+                        router.push(`/events/${entry.id}`);
+                      }}
+                    >
+                      <View style={styles.entryLeft}>
+                        <View style={styles.avatarWrap}>
+                          {selectedPartner.avatarUri ? (
+                            <Image source={{ uri: selectedPartner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+                          ) : (
+                            <Text style={styles.avatarText}>{selectedPartner.name.slice(0, 1).toUpperCase()}</Text>
+                          )}
+                        </View>
+                        <View>
+                          <Text style={styles.entryTitle}>{entry.eventType === 'partnered' ? 'Partnered' : 'Solo'} entry</Text>
+                          <Text style={styles.entryMeta}>{formatEventDateTime(entry.dateTimeStart)}</Text>
+                        </View>
+                      </View>
+                      <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
+                    </Pressable>
+                  ))}
+
+                  {filteredEntries.length === 0 ? <EmptyText>No entries for this month.</EmptyText> : null}
+                </View>
+              </>
+            ) : null}
+          </View>
+        </View>
+      </Modal>
     </ScreenContainer>
   );
 }

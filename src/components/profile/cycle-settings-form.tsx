@@ -1,3 +1,4 @@
+import { DatePickerField } from '../forms/date-picker-field';
 import { Input, Label } from '../ui/primitives';
 import type { CycleData } from '../../types/models';
 
@@ -10,11 +11,10 @@ export function CycleSettingsForm({
 }) {
   return (
     <>
-      <Label>Last period start (YYYY-MM-DD)</Label>
-      <Input
+      <DatePickerField
+        label="Last period start"
         value={cycleData.lastPeriodStart}
-        onChangeText={(value) => onChange({ ...cycleData, lastPeriodStart: value })}
-        autoCapitalize="none"
+        onChange={(value) => onChange({ ...cycleData, lastPeriodStart: value })}
       />
 
       <Label>Average cycle length</Label>

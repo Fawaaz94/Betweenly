@@ -1,20 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import {
-  DEFAULT_CYCLE_DATA,
-  deleteEvent as deleteEventFromDb,
-  getCycleData,
-  getThemeMode,
-  getUserProfile,
-  initDb,
-  insertEvent,
-  listEventsDesc,
-  updateIntimacyEvent,
-  upsertThemeMode,
-  upsertCycleData,
-  upsertUserProfile,
-} from '../../db/sqlite';
 import { defaultThemeMode, getThemeColors, type ThemeColors, type ThemeMode } from '../../constants/theme';
-import type { CreateEventInput, CycleData, IntimacyEvent, UpdateEventInput, UserProfile } from '../../types/models';
+import { DEFAULT_CYCLE_DATA, readPersistedAppData, writePersistedAppData, type PersistedAppData } from '../../lib/local-data-store';
+import type {
+  CreateEventInput,
+  CreatePartnerInput,
+  CycleData,
+  IntimacyEvent,
+  Partner,
+  UpdateEventInput,
+  UpdatePartnerInput,
+  UserProfile,
+} from '../../types/models';
 
 type CreateProfileInput = Pick<UserProfile, 'email' | 'displayName' | 'relationshipMode' | 'cycleTrackingEnabled'>;
 type UpdateUserInput = Pick<UserProfile, 'email' | 'displayName' | 'relationshipMode' | 'cycleTrackingEnabled'>;
@@ -23,6 +19,7 @@ type AppContextValue = {
   isBootstrapping: boolean;
   user: UserProfile | null;
   events: IntimacyEvent[];
+  partners: Partner[];
   cycleData: CycleData;
   themeMode: ThemeMode;
   colors: ThemeColors;
@@ -34,32 +31,50 @@ type AppContextValue = {
   saveEvent: (event: CreateEventInput) => Promise<IntimacyEvent>;
   updateEvent: (id: string, updates: UpdateEventInput) => Promise<IntimacyEvent | null>;
   deleteEvent: (id: string) => Promise<void>;
+  savePartner: (partner: CreatePartnerInput) => Promise<Partner>;
+  updatePartner: (id: string, updates: UpdatePartnerInput) => Promise<Partner | null>;
+  deletePartner: (id: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
+
+function createEventId() {
+  return `evt_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function createPartnerId() {
+  return `prt_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
 
 export function AppProvider({ children }: PropsWithChildren) {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [events, setEvents] = useState<IntimacyEvent[]>([]);
+  const [partners, setPartners] = useState<Partner[]>([]);
   const [cycleData, setCycleData] = useState<CycleData>(DEFAULT_CYCLE_DATA);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(defaultThemeMode);
 
+  const persist = useCallback(
+    async (next: Partial<PersistedAppData>) => {
+      await writePersistedAppData({
+        user: next.user ?? user,
+        events: next.events ?? events,
+        partners: next.partners ?? partners,
+        cycleData: next.cycleData ?? cycleData,
+        themeMode: next.themeMode ?? themeMode,
+      });
+    },
+    [cycleData, events, partners, themeMode, user],
+  );
+
   const bootstrap = useCallback(async () => {
     setIsBootstrapping(true);
-    await initDb();
-
-    const [profile, eventRows, cycle, theme] = await Promise.all([
-      getUserProfile(),
-      listEventsDesc(),
-      getCycleData(),
-      getThemeMode(),
-    ]);
-
-    setUser(profile);
-    setEvents(eventRows);
-    setCycleData(cycle);
-    setThemeModeState(theme);
+    const data = await readPersistedAppData();
+    setUser(data.user);
+    setEvents(data.events);
+    setPartners(data.partners);
+    setCycleData(data.cycleData);
+    setThemeModeState(data.themeMode);
     setIsBootstrapping(false);
   }, []);
 
@@ -67,61 +82,155 @@ export function AppProvider({ children }: PropsWithChildren) {
     void bootstrap();
   }, [bootstrap]);
 
-  const createProfile = useCallback(async (profile: CreateProfileInput) => {
-    const saved = await upsertUserProfile(profile);
-    setUser(saved);
-  }, []);
+  const createProfile = useCallback(
+    async (profile: CreateProfileInput) => {
+      const now = new Date().toISOString();
+      const nextUser: UserProfile = {
+        ...profile,
+        createdAt: user?.createdAt ?? now,
+        updatedAt: now,
+      };
+      setUser(nextUser);
+      await persist({ user: nextUser });
+    },
+    [persist, user?.createdAt],
+  );
 
-  const updateUser = useCallback(async (profile: UpdateUserInput) => {
-    const saved = await upsertUserProfile(profile);
-    setUser(saved);
-  }, []);
+  const updateUser = useCallback(
+    async (profile: UpdateUserInput) => {
+      const now = new Date().toISOString();
+      const nextUser: UserProfile = {
+        ...profile,
+        createdAt: user?.createdAt ?? now,
+        updatedAt: now,
+      };
+      setUser(nextUser);
+      await persist({ user: nextUser });
+    },
+    [persist, user?.createdAt],
+  );
 
-  const updateCycle = useCallback(async (nextCycleData: Omit<CycleData, 'updatedAt'>) => {
-    const saved = await upsertCycleData(nextCycleData);
-    setCycleData(saved);
-  }, []);
+  const updateCycle = useCallback(
+    async (nextCycleData: Omit<CycleData, 'updatedAt'>) => {
+      const next: CycleData = {
+        ...nextCycleData,
+        updatedAt: new Date().toISOString(),
+      };
+      setCycleData(next);
+      await persist({ cycleData: next });
+    },
+    [persist],
+  );
 
-  const setThemeMode = useCallback(async (nextThemeMode: ThemeMode) => {
-    const saved = await upsertThemeMode(nextThemeMode);
-    setThemeModeState(saved);
-  }, []);
+  const setThemeMode = useCallback(
+    async (nextThemeMode: ThemeMode) => {
+      setThemeModeState(nextThemeMode);
+      await persist({ themeMode: nextThemeMode });
+    },
+    [persist],
+  );
 
   const toggleThemeMode = useCallback(async () => {
     const nextThemeMode: ThemeMode = themeMode === 'dark' ? 'light' : 'dark';
-    const saved = await upsertThemeMode(nextThemeMode);
-    setThemeModeState(saved);
-  }, [themeMode]);
+    setThemeModeState(nextThemeMode);
+    await persist({ themeMode: nextThemeMode });
+  }, [persist, themeMode]);
 
-  const saveEvent = useCallback(async (event: CreateEventInput) => {
-    const saved = await insertEvent(event);
-    setEvents((previous) => [saved, ...previous].sort((a, b) => +new Date(b.dateTimeStart) - +new Date(a.dateTimeStart)));
-    return saved;
-  }, []);
+  const saveEvent = useCallback(
+    async (input: CreateEventInput) => {
+      const now = new Date().toISOString();
+      const saved: IntimacyEvent = {
+        ...input,
+        id: createEventId(),
+        createdAt: now,
+        updatedAt: now,
+      };
 
-  const updateEvent = useCallback(async (id: string, updates: UpdateEventInput) => {
-    const updated = await updateIntimacyEvent(id, updates);
-    if (!updated) return null;
+      const nextEvents = [...events, saved].sort((a, b) => +new Date(b.dateTimeStart) - +new Date(a.dateTimeStart));
+      setEvents(nextEvents);
+      await persist({ events: nextEvents });
+      return saved;
+    },
+    [events, persist],
+  );
 
-    setEvents((previous) =>
-      previous
-        .map((event) => (event.id === id ? updated : event))
-        .sort((a, b) => +new Date(b.dateTimeStart) - +new Date(a.dateTimeStart)),
-    );
+  const updateEvent = useCallback(
+    async (id: string, updates: UpdateEventInput) => {
+      const existing = events.find((event) => event.id === id);
+      if (!existing) return null;
 
-    return updated;
-  }, []);
+      const updated: IntimacyEvent = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      const nextEvents = events.map((event) => (event.id === id ? updated : event)).sort((a, b) => +new Date(b.dateTimeStart) - +new Date(a.dateTimeStart));
+      setEvents(nextEvents);
+      await persist({ events: nextEvents });
+      return updated;
+    },
+    [events, persist],
+  );
 
-  const deleteEvent = useCallback(async (id: string) => {
-    await deleteEventFromDb(id);
-    setEvents((previous) => previous.filter((event) => event.id !== id));
-  }, []);
+  const deleteEvent = useCallback(
+    async (id: string) => {
+      const nextEvents = events.filter((event) => event.id !== id);
+      setEvents(nextEvents);
+      await persist({ events: nextEvents });
+    },
+    [events, persist],
+  );
+
+  const savePartner = useCallback(
+    async (input: CreatePartnerInput) => {
+      const now = new Date().toISOString();
+      const saved: Partner = {
+        ...input,
+        id: createPartnerId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const nextPartners = [...partners, saved].sort((a, b) => a.name.localeCompare(b.name));
+      setPartners(nextPartners);
+      await persist({ partners: nextPartners });
+      return saved;
+    },
+    [partners, persist],
+  );
+
+  const updatePartner = useCallback(
+    async (id: string, updates: UpdatePartnerInput) => {
+      const existing = partners.find((partner) => partner.id === id);
+      if (!existing) return null;
+
+      const updated: Partner = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      const nextPartners = partners.map((partner) => (partner.id === id ? updated : partner)).sort((a, b) => a.name.localeCompare(b.name));
+      setPartners(nextPartners);
+      await persist({ partners: nextPartners });
+      return updated;
+    },
+    [partners, persist],
+  );
+
+  const deletePartner = useCallback(
+    async (id: string) => {
+      const nextPartners = partners.filter((partner) => partner.id !== id);
+      setPartners(nextPartners);
+      await persist({ partners: nextPartners });
+    },
+    [partners, persist],
+  );
 
   const value = useMemo<AppContextValue>(
     () => ({
       isBootstrapping,
       user,
       events,
+      partners,
       cycleData,
       themeMode,
       colors: getThemeColors(themeMode),
@@ -133,18 +242,25 @@ export function AppProvider({ children }: PropsWithChildren) {
       saveEvent,
       updateEvent,
       deleteEvent,
+      savePartner,
+      updatePartner,
+      deletePartner,
     }),
     [
       createProfile,
       cycleData,
       deleteEvent,
+      deletePartner,
       events,
       isBootstrapping,
+      partners,
       saveEvent,
+      savePartner,
       setThemeMode,
       themeMode,
       toggleThemeMode,
       updateEvent,
+      updatePartner,
       updateCycle,
       updateUser,
       user,

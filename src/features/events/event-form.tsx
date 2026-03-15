@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, StyleSheet, Text } from 'react-native';
+import { DatePickerField } from '../../components/forms/date-picker-field';
 import { LabeledInput } from '../../components/forms/labeled-input';
 import {
   Chip,
@@ -117,13 +118,7 @@ export function EventFormScreen({
         />
       ) : null}
 
-      <LabeledInput
-        label="Start date (YYYY-MM-DD)"
-        value={formValues.startDate}
-        onChangeText={(value) => setField('startDate', value)}
-        autoCapitalize="none"
-        placeholder="2026-03-14"
-      />
+      <DatePickerField label="Start date" value={formValues.startDate} onChange={(value) => setField('startDate', value)} />
       <LabeledInput
         label="Start time (HH:MM)"
         value={formValues.startTime}
@@ -134,13 +129,7 @@ export function EventFormScreen({
 
       <Label>End time (optional)</Label>
       <NoteText>Set both end date and end time, or leave both empty and provide duration.</NoteText>
-      <LabeledInput
-        label="End date (YYYY-MM-DD)"
-        value={formValues.endDate}
-        onChangeText={(value) => setField('endDate', value)}
-        autoCapitalize="none"
-        placeholder="2026-03-14"
-      />
+      <DatePickerField label="End date" value={formValues.endDate} onChange={(value) => setField('endDate', value)} />
       <LabeledInput
         label="End time (HH:MM)"
         value={formValues.endTime}
@@ -209,4 +198,3 @@ export function EventFormScreen({
     </ScreenContainer>
   );
 }
-

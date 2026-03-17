@@ -21,8 +21,9 @@ function parseDate(value: string) {
 }
 
 export function DatePickerField({ label, value, onChange, placeholder = 'Select date' }: DatePickerFieldProps) {
-  const { colors, theme } = useTheme();
+  const { colors, theme, themeMode } = useTheme();
   const [showPicker, setShowPicker] = useState(false);
+  const pickerTextColor = themeMode === 'dark' ? '#FFFFFF' : '#000000';
 
   const styles = useMemo(
     () =>
@@ -96,7 +97,14 @@ export function DatePickerField({ label, value, onChange, placeholder = 'Select 
                 <Text style={styles.iosDoneText}>Done</Text>
               </Pressable>
             </View>
-            <DateTimePicker value={currentDate} mode="date" display="spinner" onChange={handleChange} />
+            <DateTimePicker
+              value={currentDate}
+              mode="date"
+              display="spinner"
+              onChange={handleChange}
+              textColor={pickerTextColor}
+              themeVariant={themeMode}
+            />
           </View>
         ) : (
           <DateTimePicker value={currentDate} mode="date" display="default" onChange={handleChange} />

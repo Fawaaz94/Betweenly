@@ -25,6 +25,12 @@ function cleanText(value: string) {
   return value.trim();
 }
 
+function normalizeInstagram(value: string) {
+  const cleaned = cleanText(value).replace(/^@+/, '');
+  if (!cleaned) return '';
+  return `@${cleaned}`;
+}
+
 export function createDefaultPartnerFormValues(): PartnerFormValues {
   return {
     name: '',
@@ -73,7 +79,7 @@ export function validatePartnerForm(values: PartnerFormValues): PartnerValidatio
       name,
       birthday: birthday || null,
       nationality,
-      instagram: cleanText(values.instagram),
+      instagram: normalizeInstagram(values.instagram),
       notes: cleanText(values.notes),
       phoneNumber: cleanText(values.phoneNumber),
       avatarUri: values.avatarUri,

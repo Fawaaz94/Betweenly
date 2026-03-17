@@ -105,6 +105,9 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
           backgroundColor: 'rgba(0,0,0,0.28)',
           justifyContent: 'flex-end',
         },
+        modalDismissArea: {
+          ...StyleSheet.absoluteFillObject,
+        },
         modalSheet: {
           backgroundColor: colors.appBg,
           borderTopLeftRadius: theme.radius.xxl,
@@ -113,6 +116,7 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
           paddingTop: theme.spacing.md,
           paddingBottom: theme.spacing.xxl,
           minHeight: '68%',
+          maxHeight: '84%',
         },
         modalHandle: {
           alignSelf: 'center',
@@ -143,6 +147,23 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
           backgroundColor: colors.surface,
           alignItems: 'center',
           justifyContent: 'center',
+        },
+        modalCancelButton: {
+          minWidth: 52,
+          height: 38,
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surface,
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingHorizontal: theme.spacing.sm,
+        },
+        modalCancelText: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
         },
         countryList: {
           marginTop: theme.spacing.sm,
@@ -242,6 +263,11 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
     ]);
   };
 
+  const closeCountryModal = () => {
+    setCountrySearch('');
+    setCountryModalVisible(false);
+  };
+
   return (
     <ScreenContainer>
       <ScreenTitle title={title} showBackButton />
@@ -274,7 +300,10 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
       <LabeledInput
         label="Instagram"
         value={formValues.instagram}
-        onChangeText={(value) => setField('instagram', value)}
+        onChangeText={(value) => {
+          const cleaned = value.replace(/^@+/, '');
+          setField('instagram', cleaned ? `@${cleaned}` : '');
+        }}
         autoCapitalize="none"
         placeholder="@username"
       />
@@ -294,19 +323,21 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
       <PrimaryButton label={saveStatus === 'saving' ? 'Saving...' : submitLabel} onPress={() => void handleSubmit()} />
       {onDelete ? <DangerButton label="Delete partner" onPress={() => void handleDelete()} /> : null}
 
-      <Modal visible={countryModalVisible} animationType="slide" transparent onRequestClose={() => setCountryModalVisible(false)}>
+      <Modal visible={countryModalVisible} animationType="slide" transparent onRequestClose={closeCountryModal}>
         <View style={styles.modalBackdrop}>
+          <Pressable style={styles.modalDismissArea} onPress={closeCountryModal} />
           <View style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Pressable style={styles.closeButton} onPress={() => setCountryModalVisible(false)}>
+              <Pressable style={styles.closeButton} onPress={closeCountryModal}>
                 <Ionicons name="close" size={theme.sizing.iconMd} color={colors.textPrimary} />
               </Pressable>
               <Text style={styles.modalTitle}>Select Nationality</Text>
-              <View style={styles.closeButton} />
+              <Pressable style={styles.modalCancelButton} onPress={closeCountryModal}>
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </Pressable>
             </View>
 
-            <Label>Search country</Label>
             <Input value={countrySearch} onChangeText={setCountrySearch} placeholder="Type country name or code" autoCapitalize="none" />
 
             <ScrollView style={styles.countryList}>
@@ -316,8 +347,7 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
                   style={styles.countryRow}
                   onPress={() => {
                     setField('nationality', country.code);
-                    setCountrySearch('');
-                    setCountryModalVisible(false);
+                    closeCountryModal();
                   }}
                 >
                   <View style={styles.countryRowLeft}>

@@ -79,7 +79,7 @@ export function Input(props: TextInputProps) {
 export function MultilineInput(props: TextInputProps) {
   const styles = useThemedStyles();
 
-  return <Input multiline textAlignVertical="top" {...props} style={[styles.input, styles.textArea, props.style]} />;
+  return <Input multiline textAlignVertical="top" scrollEnabled {...props} style={[styles.input, styles.textArea, props.style]} />;
 }
 
 export function PrimaryButton({
@@ -248,6 +248,8 @@ function createStyles(theme: Theme, colors: ThemeColors) {
     },
     textArea: {
       minHeight: theme.sizing.inputHeight * 1.7,
+      height: theme.sizing.inputHeight * 1.7,
+      maxHeight: theme.sizing.inputHeight * 1.7,
       paddingTop: theme.spacing.sm + 2,
     },
     primaryButton: {

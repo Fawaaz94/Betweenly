@@ -370,6 +370,24 @@ export function PartnersScreen() {
           fontSize: theme.typography.fontSize.sm,
           lineHeight: theme.typography.lineHeight.sm,
         },
+        notesRow: {
+          minHeight: theme.sizing.buttonHeight + 16,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: theme.spacing.sm,
+        },
+        notesIconWrap: {
+          paddingTop: 2,
+        },
+        notesScroll: {
+          marginTop: 2,
+          maxHeight: theme.spacing.huge * 2,
+        },
+        notesScrollContent: {
+          paddingRight: theme.spacing.xs,
+        },
         noteText: {
           color: colors.textSecondary,
           fontSize: theme.typography.fontSize.sm,
@@ -639,13 +657,20 @@ export function PartnersScreen() {
                 </View>
 
                 <View style={styles.sectionCard}>
-                  <View style={styles.sectionRow}>
-                    <View style={styles.sectionRowLeft}>
+                  <View style={styles.notesRow}>
+                    <View style={styles.notesIconWrap}>
                       <Ionicons name="document-text-outline" size={theme.sizing.iconMd} color={colors.textSecondary} />
-                      <View style={styles.sectionTextBlock}>
-                        <Text style={styles.sectionLabel}>Notes</Text>
+                    </View>
+                    <View style={styles.sectionTextBlock}>
+                      <Text style={styles.sectionLabel}>Notes</Text>
+                      <ScrollView
+                        style={styles.notesScroll}
+                        contentContainerStyle={styles.notesScrollContent}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator={false}
+                      >
                         <Text style={styles.sectionSubValue}>{selectedPartner.notes || 'No notes'}</Text>
-                      </View>
+                      </ScrollView>
                     </View>
                   </View>
                 </View>

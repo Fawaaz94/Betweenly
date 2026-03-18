@@ -9,6 +9,7 @@ import { formatDateTime } from '../../lib/date';
 import { useTheme } from '../../theme/use-theme';
 import { useAppState } from '../app/app-context';
 import type { AppMedia } from '../../types/models';
+import { getEventRatingOption } from './event-rating';
 
 function getExtension(uri: string, fileName: string | null | undefined) {
   const filePart = (fileName ?? uri).split('?')[0];
@@ -147,6 +148,25 @@ export function EventDetailsScreen() {
           flex: 1,
           gap: 2,
         },
+        ratingValueWrap: {
+          width: 44,
+          height: 40,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        ratingEmoji: {
+          fontSize: 30,
+          lineHeight: 34,
+          textAlignVertical: 'center',
+          includeFontPadding: false,
+        },
+        ratingHint: {
+          marginTop: theme.spacing.xs,
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
+        },
         imagesSection: {
           marginTop: theme.spacing.xl,
           gap: theme.spacing.sm,
@@ -246,6 +266,7 @@ export function EventDetailsScreen() {
   const hasPartner = Boolean(partnerName);
   const hasNotes = Boolean(noteValue);
   const hasImages = eventMedia.length > 0;
+  const selectedRatingOption = getEventRatingOption(event.overallRating);
 
   return (
     <SlideUpSheet onClose={handleClose}>
@@ -299,6 +320,19 @@ export function EventDetailsScreen() {
             <View style={styles.detailTextWrap}>
               <Text style={styles.detailLabel}>Protection</Text>
               <Text style={styles.detailValue}>{toProtectionLabel(event.toysUsed)}</Text>
+            </View>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Ionicons name="happy-outline" size={theme.sizing.iconMd} color={colors.textMuted} />
+            <View style={styles.detailTextWrap}>
+              <Text style={styles.detailLabel}>Rating</Text>
+              <View style={styles.ratingValueWrap}>
+                <Text style={styles.ratingEmoji}>{selectedRatingOption.emoji}</Text>
+              </View>
+              <Text style={styles.ratingHint}>
+                {selectedRatingOption.label}
+              </Text>
             </View>
           </View>
 

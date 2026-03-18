@@ -1,23 +1,13 @@
-import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { toDateInput, toTimeInput } from '../../lib/date';
-import type { CreateEventInput, IntimacyEvent } from '../../types/models';
-import { useTheme } from '../../theme/use-theme';
-import { useAppState } from '../app/app-context';
+import DateTimePicker, {type DateTimePickerEvent} from '@react-native-community/datetimepicker';
+import {Ionicons} from '@expo/vector-icons';
+import {useRouter} from 'expo-router';
+import {useEffect, useMemo, useState} from 'react';
+import {Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,} from 'react-native';
+import {toDateInput, toTimeInput} from '../../lib/date';
+import type {CreateEventInput, IntimacyEvent} from '../../types/models';
+import {EVENT_RATING_OPTIONS, type EventRatingValue, toEventRatingValue} from './event-rating';
+import {useTheme} from '../../theme/use-theme';
+import {useAppState} from '../app/app-context';
 
 type PickerMode = 'date' | 'time' | null;
 
@@ -58,6 +48,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
   const [durationMinutes, setDurationMinutes] = useState(String(initialEvent?.durationMinutes ?? 45));
   const [notes, setNotes] = useState(initialEvent?.notes ?? '');
   const [noteHeight, setNoteHeight] = useState(120);
+  const [rating, setRating] = useState<EventRatingValue>(() => toEventRatingValue(initialEvent?.overallRating));
   const [protectionUsed, setProtectionUsed] = useState(() => (initialEvent ? isProtectionUsedValue(initialEvent.toysUsed) : true));
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
@@ -109,6 +100,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     setIosPickerValue(parseIsoDate(initialEvent.dateTimeStart));
     setDurationMinutes(String(initialEvent.durationMinutes));
     setNotes(initialEvent.notes ?? '');
+    setRating(toEventRatingValue(initialEvent.overallRating));
     setProtectionUsed(isProtectionUsedValue(initialEvent.toysUsed));
     setSelectedActivityId(
       matchedActivity?.id ?? getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId),
@@ -142,8 +134,8 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     () => partners.find((partner) => partner.id === selectedPartnerId) ?? null,
     [partners, selectedPartnerId],
   );
-  const isMasturbationActivitySelected = selectedActivity?.name.trim().toLowerCase() === 'masturbation';
-  const shouldHidePartnerAndProtectionSections = isMasturbationActivitySelected;
+
+  const shouldHidePartnerAndProtectionSections = selectedActivity?.name.trim().toLowerCase() === 'masturbation';
 
   const activityEntryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -283,6 +275,54 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         },
         protectionTextActive: {
           color: colors.accent,
+        },
+        ratingWrap: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: theme.spacing.xs,
+          flexShrink: 1,
+          marginTop: theme.spacing.xs,
+        },
+        ratingOption: {
+          width: 50,
+          height: 50,
+          borderRadius: 25,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surfaceAlt,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        ratingOptionActive: {
+          borderColor: colors.accent,
+          backgroundColor: colors.chipActiveBg,
+        },
+        ratingEmojiWrap: {
+          width: 30,
+          height: 30,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        ratingEmoji: {
+          fontSize: 25,
+          lineHeight: 30,
+          textAlign: 'center',
+          textAlignVertical: 'center',
+          includeFontPadding: false,
+        },
+        ratingHint: {
+          marginTop: theme.spacing.xs,
+          marginBottom: theme.spacing.sm,
+          marginRight: theme.spacing.md,
+          textAlign: 'right',
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
+        },
+        ratingRow: {
+          paddingTop: theme.spacing.xs + 2,
         },
         durationInput: {
           minHeight: theme.sizing.buttonHeight + 2,
@@ -513,8 +553,8 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         dateTimeEnd: null,
         durationMinutes: parsedDuration,
         location: initialEvent?.location ?? 'Not set',
-        overallRating: initialEvent?.overallRating ?? 4,
-        emotionalRating: initialEvent?.emotionalRating ?? 4,
+        overallRating: rating,
+        emotionalRating: rating,
         notes: notes.trim(),
         positions: selectedActivity.name,
         toysUsed: protectionValue,
@@ -626,6 +666,33 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
             </View>
           </View>
         ) : null}
+
+        <View style={styles.sectionCard}>
+          <View style={[styles.row, styles.ratingRow]}>
+            <Text style={styles.rowLabel}>Rating</Text>
+            <View style={styles.ratingWrap}>
+              {EVENT_RATING_OPTIONS.map((option) => {
+                const isActive = rating === option.value;
+                return (
+                  <Pressable
+                    key={option.value}
+                    accessibilityRole="button"
+                    accessibilityLabel={option.label}
+                    onPress={() => setRating(option.value)}
+                    style={[styles.ratingOption, isActive ? styles.ratingOptionActive : null]}
+                  >
+                    <View style={styles.ratingEmojiWrap}>
+                      <Text style={styles.ratingEmoji}>{option.emoji}</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+          <Text style={styles.ratingHint}>
+            {EVENT_RATING_OPTIONS.find((option) => option.value === rating)?.label ?? 'Okay'}
+          </Text>
+        </View>
 
         {!shouldHidePartnerAndProtectionSections ? (
           <View style={styles.sectionCard}>

@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { toDateInput, toTimeInput } from '../../lib/date';
+import type { CreateEventInput, IntimacyEvent } from '../../types/models';
 import { useTheme } from '../../theme/use-theme';
 import { useAppState } from '../app/app-context';
 
@@ -31,22 +32,38 @@ function getDefaultActivityId(activityIds: string[], isDefaultById: Map<string, 
   return activityIds[0] ?? null;
 }
 
-export function LogEventScreen() {
+function parseIsoDate(iso: string) {
+  const parsed = new Date(iso);
+  return Number.isNaN(+parsed) ? new Date() : parsed;
+}
+
+function isProtectionUsedValue(value: string) {
+  return !value.toLowerCase().includes('not used');
+}
+
+type EventEntryScreenProps = {
+  mode: 'create' | 'edit';
+  initialEvent?: IntimacyEvent;
+};
+
+export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
   const router = useRouter();
   const { colors, theme, themeMode } = useTheme();
-  const { saveEvent, user, activities, partners, events } = useAppState();
+  const { saveEvent, updateEvent, user, activities, partners, events } = useAppState();
+  const isEditMode = mode === 'edit' && Boolean(initialEvent);
 
-  const [entryDate, setEntryDate] = useState(new Date());
+  const [entryDate, setEntryDate] = useState(() => (initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : new Date()));
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
-  const [iosPickerValue, setIosPickerValue] = useState(new Date());
-  const [durationMinutes, setDurationMinutes] = useState('45');
-  const [notes, setNotes] = useState('');
+  const [iosPickerValue, setIosPickerValue] = useState(() => (initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : new Date()));
+  const [durationMinutes, setDurationMinutes] = useState(String(initialEvent?.durationMinutes ?? 45));
+  const [notes, setNotes] = useState(initialEvent?.notes ?? '');
   const [noteHeight, setNoteHeight] = useState(120);
-  const [protectionUsed, setProtectionUsed] = useState(true);
+  const [protectionUsed, setProtectionUsed] = useState(() => (initialEvent ? isProtectionUsedValue(initialEvent.toysUsed) : true));
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [pendingPartnerId, setPendingPartnerId] = useState<string | null>(null);
+  const [hydratedEventId, setHydratedEventId] = useState<string | null>(null);
   const [activityModalVisible, setActivityModalVisible] = useState(false);
   const [partnerModalVisible, setPartnerModalVisible] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -63,6 +80,7 @@ export function LogEventScreen() {
   );
 
   useEffect(() => {
+    if (mode !== 'create') return;
     if (activities.length === 0) {
       setSelectedActivityId(null);
       return;
@@ -73,7 +91,42 @@ export function LogEventScreen() {
 
     const defaultActivityId = getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId);
     setSelectedActivityId(defaultActivityId);
-  }, [activities, activityIds, isDefaultByActivityId, selectedActivityId, sexActivityId]);
+  }, [activities, activityIds, isDefaultByActivityId, mode, selectedActivityId, sexActivityId]);
+
+  useEffect(() => {
+    if (!isEditMode || !initialEvent) return;
+    if (hydratedEventId === initialEvent.id) return;
+    if (activities.length === 0) return;
+
+    const matchedActivity = activities.find(
+      (activity) => activity.name.trim().toLowerCase() === initialEvent.positions.trim().toLowerCase(),
+    );
+    const matchedPartner = partners.find(
+      (partner) => partner.name.trim().toLowerCase() === (initialEvent.partnerName ?? '').trim().toLowerCase(),
+    );
+
+    setEntryDate(parseIsoDate(initialEvent.dateTimeStart));
+    setIosPickerValue(parseIsoDate(initialEvent.dateTimeStart));
+    setDurationMinutes(String(initialEvent.durationMinutes));
+    setNotes(initialEvent.notes ?? '');
+    setProtectionUsed(isProtectionUsedValue(initialEvent.toysUsed));
+    setSelectedActivityId(
+      matchedActivity?.id ?? getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId),
+    );
+    setPendingActivityId(matchedActivity?.id ?? null);
+    setSelectedPartnerId(matchedPartner?.id ?? null);
+    setPendingPartnerId(matchedPartner?.id ?? null);
+    setHydratedEventId(initialEvent.id);
+  }, [
+    activities,
+    activityIds,
+    hydratedEventId,
+    initialEvent,
+    isDefaultByActivityId,
+    isEditMode,
+    partners,
+    sexActivityId,
+  ]);
 
   useEffect(() => {
     if (!selectedPartnerId) return;
@@ -89,6 +142,8 @@ export function LogEventScreen() {
     () => partners.find((partner) => partner.id === selectedPartnerId) ?? null,
     [partners, selectedPartnerId],
   );
+  const isMasturbationActivitySelected = selectedActivity?.name.trim().toLowerCase() === 'masturbation';
+  const shouldHidePartnerAndProtectionSections = isMasturbationActivitySelected;
 
   const activityEntryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -437,31 +492,47 @@ export function LogEventScreen() {
     }
 
     const parsedDuration = Number.parseInt(durationMinutes.trim(), 10);
-    if (!Number.isInteger(parsedDuration) || parsedDuration < 1) {
-      setErrorMessage('Duration must be at least 1 minute.');
+    if (!Number.isInteger(parsedDuration) || parsedDuration < 0) {
+      setErrorMessage('Duration cannot be negative.');
       return;
     }
 
     try {
       setIsSaving(true);
-      const saved = await saveEvent({
+      const partnerForEvent = shouldHidePartnerAndProtectionSections ? null : selectedPartner;
+      const protectionValue = shouldHidePartnerAndProtectionSections
+        ? 'Protection: Not used'
+        : protectionUsed
+          ? 'Protection: Used'
+          : 'Protection: Not used';
+      const payload: CreateEventInput = {
         ownerUserId: user?.email ?? 'local_user',
-        eventType: selectedPartner ? 'partnered' : 'solo',
-        partnerName: selectedPartner?.name ?? null,
+        eventType: partnerForEvent ? 'partnered' : 'solo',
+        partnerName: partnerForEvent?.name ?? null,
         dateTimeStart: `${toDateInput(entryDate)}T${toTimeInput(entryDate)}:00`,
         dateTimeEnd: null,
         durationMinutes: parsedDuration,
-        location: 'Not set',
-        overallRating: 4,
-        emotionalRating: 4,
+        location: initialEvent?.location ?? 'Not set',
+        overallRating: initialEvent?.overallRating ?? 4,
+        emotionalRating: initialEvent?.emotionalRating ?? 4,
         notes: notes.trim(),
         positions: selectedActivity.name,
-        toysUsed: protectionUsed ? 'Protection: Used' : 'Protection: Not used',
-        whatWorkedWell: '',
-        whatToTryNext: '',
-        isSharedWithPartner: Boolean(user?.relationshipMode === 'linked' && selectedPartner),
-      });
-      router.replace(`/events/${saved.id}`);
+        toysUsed: protectionValue,
+        whatWorkedWell: initialEvent?.whatWorkedWell ?? '',
+        whatToTryNext: initialEvent?.whatToTryNext ?? '',
+        isSharedWithPartner: Boolean(partnerForEvent && (initialEvent?.isSharedWithPartner ?? user?.relationshipMode === 'linked')),
+      };
+
+      if (isEditMode && initialEvent) {
+        const updated = await updateEvent(initialEvent.id, payload);
+        if (!updated) {
+          throw new Error('Unable to update event.');
+        }
+        router.replace(`/events/${updated.id}`);
+      } else {
+        const saved = await saveEvent(payload);
+        router.replace(`/events/${saved.id}`);
+      }
     } catch {
       setErrorMessage('Unable to save. Please try again.');
       Alert.alert('Unable to save', 'Please try again.');
@@ -473,6 +544,10 @@ export function LogEventScreen() {
   const closeComposer = () => {
     if (router.canGoBack()) {
       router.back();
+      return;
+    }
+    if (isEditMode && initialEvent) {
+      router.replace(`/events/${initialEvent.id}`);
       return;
     }
     router.replace('/(tabs)');
@@ -490,7 +565,7 @@ export function LogEventScreen() {
           <Pressable onPress={closeComposer} style={styles.headerButton}>
             <Text style={[styles.headerButtonText, styles.headerButtonMutedText]}>Cancel</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>New Entry</Text>
+          <Text style={styles.headerTitle}>{isEditMode ? 'Edit Entry' : 'New Entry'}</Text>
           <Pressable onPress={() => void handleSave()} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>{isSaving ? 'Saving...' : 'Save'}</Text>
           </Pressable>
@@ -530,53 +605,57 @@ export function LogEventScreen() {
           ) : null}
         </View>
 
-        <View style={styles.sectionCard}>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Protection</Text>
-            <View style={styles.protectionWrap}>
-              <Pressable
-                onPress={() => setProtectionUsed(true)}
-                style={[styles.protectionButton, protectionUsed ? styles.protectionButtonActive : null]}
-              >
-                <Text style={[styles.protectionText, protectionUsed ? styles.protectionTextActive : null]}>Used</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setProtectionUsed(false)}
-                style={[styles.protectionButton, !protectionUsed ? styles.protectionButtonActive : null]}
-              >
-                <Text style={[styles.protectionText, !protectionUsed ? styles.protectionTextActive : null]}>Not Used</Text>
-              </Pressable>
+        {!shouldHidePartnerAndProtectionSections ? (
+          <View style={styles.sectionCard}>
+            <View style={styles.row}>
+              <Text style={styles.rowLabel}>Protection</Text>
+              <View style={styles.protectionWrap}>
+                <Pressable
+                  onPress={() => setProtectionUsed(true)}
+                  style={[styles.protectionButton, protectionUsed ? styles.protectionButtonActive : null]}
+                >
+                  <Text style={[styles.protectionText, protectionUsed ? styles.protectionTextActive : null]}>Used</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setProtectionUsed(false)}
+                  style={[styles.protectionButton, !protectionUsed ? styles.protectionButtonActive : null]}
+                >
+                  <Text style={[styles.protectionText, !protectionUsed ? styles.protectionTextActive : null]}>Not Used</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
-        </View>
+        ) : null}
 
-        <View style={styles.sectionCard}>
-          <Pressable
-            onPress={() => {
-              setPendingPartnerId(selectedPartnerId);
-              setPartnerModalVisible(true);
-            }}
-            style={({ pressed }) => [styles.sectionTitleRow, pressed ? styles.rowPressed : null]}
-          >
-            <Text style={styles.rowLabel}>Select Partners</Text>
-            <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
-          </Pressable>
-          {selectedPartner ? (
-            <>
-              <View style={styles.divider} />
-              <View style={styles.selectedRow}>
-                <View style={styles.avatar}>
-                  {selectedPartner.avatarUri ? (
-                    <Image source={{ uri: selectedPartner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
-                  ) : (
-                    <Text style={styles.avatarText}>{selectedPartner.name.slice(0, 1).toUpperCase()}</Text>
-                  )}
+        {!shouldHidePartnerAndProtectionSections ? (
+          <View style={styles.sectionCard}>
+            <Pressable
+              onPress={() => {
+                setPendingPartnerId(selectedPartnerId);
+                setPartnerModalVisible(true);
+              }}
+              style={({ pressed }) => [styles.sectionTitleRow, pressed ? styles.rowPressed : null]}
+            >
+              <Text style={styles.rowLabel}>Select Partners</Text>
+              <Ionicons name="chevron-forward" size={theme.sizing.iconSm} color={colors.textMuted} />
+            </Pressable>
+            {selectedPartner ? (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.selectedRow}>
+                  <View style={styles.avatar}>
+                    {selectedPartner.avatarUri ? (
+                      <Image source={{ uri: selectedPartner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+                    ) : (
+                      <Text style={styles.avatarText}>{selectedPartner.name.slice(0, 1).toUpperCase()}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.selectedText}>{selectedPartner.name}</Text>
                 </View>
-                <Text style={styles.selectedText}>{selectedPartner.name}</Text>
-              </View>
-            </>
-          ) : null}
-        </View>
+              </>
+            ) : null}
+          </View>
+        ) : null}
 
         <View style={styles.sectionCard}>
           <TextInput
@@ -785,4 +864,8 @@ export function LogEventScreen() {
       </Modal>
     </View>
   );
+}
+
+export function LogEventScreen() {
+  return <EventEntryScreen mode="create" />;
 }

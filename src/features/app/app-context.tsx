@@ -2,11 +2,16 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { defaultThemeMode, getThemeColors, type ThemeColors, type ThemeMode } from '../../constants/theme';
 import { DEFAULT_CYCLE_DATA, readPersistedAppData, writePersistedAppData, type PersistedAppData } from '../../lib/local-data-store';
 import type {
+  Activity,
+  AppMedia,
+  CreateActivityInput,
+  CreateAppMediaInput,
   CreateEventInput,
   CreatePartnerInput,
   CycleData,
   IntimacyEvent,
   Partner,
+  UpdateActivityInput,
   UpdateEventInput,
   UpdatePartnerInput,
   UserProfile,
@@ -20,6 +25,8 @@ type AppContextValue = {
   user: UserProfile | null;
   events: IntimacyEvent[];
   partners: Partner[];
+  media: AppMedia[];
+  activities: Activity[];
   cycleData: CycleData;
   themeMode: ThemeMode;
   colors: ThemeColors;
@@ -34,6 +41,11 @@ type AppContextValue = {
   savePartner: (partner: CreatePartnerInput) => Promise<Partner>;
   updatePartner: (id: string, updates: UpdatePartnerInput) => Promise<Partner | null>;
   deletePartner: (id: string) => Promise<void>;
+  saveMedia: (media: CreateAppMediaInput) => Promise<AppMedia>;
+  deleteMedia: (id: string) => Promise<void>;
+  saveActivity: (activity: CreateActivityInput) => Promise<Activity>;
+  updateActivity: (id: string, updates: UpdateActivityInput) => Promise<Activity | null>;
+  deleteActivity: (id: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -46,11 +58,21 @@ function createPartnerId() {
   return `prt_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
+function createActivityId() {
+  return `act_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
+function createMediaId() {
+  return `md_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
 export function AppProvider({ children }: PropsWithChildren) {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [events, setEvents] = useState<IntimacyEvent[]>([]);
   const [partners, setPartners] = useState<Partner[]>([]);
+  const [media, setMedia] = useState<AppMedia[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [cycleData, setCycleData] = useState<CycleData>(DEFAULT_CYCLE_DATA);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(defaultThemeMode);
 
@@ -60,11 +82,13 @@ export function AppProvider({ children }: PropsWithChildren) {
         user: next.user ?? user,
         events: next.events ?? events,
         partners: next.partners ?? partners,
+        media: next.media ?? media,
+        activities: next.activities ?? activities,
         cycleData: next.cycleData ?? cycleData,
         themeMode: next.themeMode ?? themeMode,
       });
     },
-    [cycleData, events, partners, themeMode, user],
+    [activities, cycleData, events, media, partners, themeMode, user],
   );
 
   const bootstrap = useCallback(async () => {
@@ -73,6 +97,8 @@ export function AppProvider({ children }: PropsWithChildren) {
     setUser(data.user);
     setEvents(data.events);
     setPartners(data.partners);
+    setMedia(data.media);
+    setActivities(data.activities);
     setCycleData(data.cycleData);
     setThemeModeState(data.themeMode);
     setIsBootstrapping(false);
@@ -225,12 +251,86 @@ export function AppProvider({ children }: PropsWithChildren) {
     [partners, persist],
   );
 
+  const saveMedia = useCallback(
+    async (input: CreateAppMediaInput) => {
+      const now = new Date().toISOString();
+      const saved: AppMedia = {
+        ...input,
+        id: createMediaId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const nextMedia = [saved, ...media].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+      setMedia(nextMedia);
+      await persist({ media: nextMedia });
+      return saved;
+    },
+    [media, persist],
+  );
+
+  const deleteMedia = useCallback(
+    async (id: string) => {
+      const nextMedia = media.filter((item) => item.id !== id);
+      setMedia(nextMedia);
+      await persist({ media: nextMedia });
+    },
+    [media, persist],
+  );
+
+  const saveActivity = useCallback(
+    async (input: CreateActivityInput) => {
+      const now = new Date().toISOString();
+      const saved: Activity = {
+        ...input,
+        id: createActivityId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const nextActivities = [...activities, saved].sort((a, b) => a.name.localeCompare(b.name));
+      setActivities(nextActivities);
+      await persist({ activities: nextActivities });
+      return saved;
+    },
+    [activities, persist],
+  );
+
+  const updateActivity = useCallback(
+    async (id: string, updates: UpdateActivityInput) => {
+      const existing = activities.find((activity) => activity.id === id);
+      if (!existing) return null;
+
+      const updated: Activity = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      const nextActivities = activities
+        .map((activity) => (activity.id === id ? updated : activity))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setActivities(nextActivities);
+      await persist({ activities: nextActivities });
+      return updated;
+    },
+    [activities, persist],
+  );
+
+  const deleteActivity = useCallback(
+    async (id: string) => {
+      const nextActivities = activities.filter((activity) => activity.id !== id);
+      setActivities(nextActivities);
+      await persist({ activities: nextActivities });
+    },
+    [activities, persist],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       isBootstrapping,
       user,
       events,
       partners,
+      media,
+      activities,
       cycleData,
       themeMode,
       colors: getThemeColors(themeMode),
@@ -245,20 +345,32 @@ export function AppProvider({ children }: PropsWithChildren) {
       savePartner,
       updatePartner,
       deletePartner,
+      saveMedia,
+      deleteMedia,
+      saveActivity,
+      updateActivity,
+      deleteActivity,
     }),
     [
+      activities,
       createProfile,
       cycleData,
+      deleteMedia,
+      deleteActivity,
       deleteEvent,
       deletePartner,
       events,
       isBootstrapping,
+      media,
       partners,
       saveEvent,
+      saveMedia,
+      saveActivity,
       savePartner,
       setThemeMode,
       themeMode,
       toggleThemeMode,
+      updateActivity,
       updateEvent,
       updatePartner,
       updateCycle,

@@ -22,11 +22,9 @@ const settingsSections: SettingsSection[] = [
   {
     key: 'activity',
     items: [
-      { label: 'Activities', icon: 'apps-outline', route: '/(tabs)/insights' },
+      { label: 'Activities', icon: 'apps-outline', route: '/activities' },
       { label: 'Partners', icon: 'people-outline', route: '/partner/shared' },
-      { label: 'Media Gallery', icon: 'images-outline' },
-      { label: 'Tags', icon: 'pricetag-outline' },
-      { label: 'STD Tests', icon: 'clipboard-outline' },
+      { label: 'Media Gallery', icon: 'images-outline', route: '/media-gallery' },
     ],
   },
   {

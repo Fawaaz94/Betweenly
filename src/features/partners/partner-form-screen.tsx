@@ -224,7 +224,9 @@ export function PartnerFormScreen({ title, initialValues, submitLabel, onSubmit,
     });
 
     if (!result.canceled) {
-      setField('avatarUri', result.assets[0]?.uri ?? null);
+      const selectedAsset = result.assets[0];
+      setField('avatarUri', selectedAsset?.uri ?? null);
+      setField('avatarAssetId', selectedAsset?.assetId ?? null);
     }
   };
 

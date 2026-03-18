@@ -10,6 +10,7 @@ export type PartnerFormValues = {
   notes: string;
   phoneNumber: string;
   avatarUri: string | null;
+  avatarAssetId: string | null;
 };
 
 export type PartnerValidationIssue = {
@@ -40,6 +41,7 @@ export function createDefaultPartnerFormValues(): PartnerFormValues {
     notes: '',
     phoneNumber: '',
     avatarUri: null,
+    avatarAssetId: null,
   };
 }
 
@@ -52,6 +54,7 @@ export function createPartnerFormValuesFromPartner(partner: Partner): PartnerFor
     notes: partner.notes,
     phoneNumber: partner.phoneNumber,
     avatarUri: partner.avatarUri,
+    avatarAssetId: partner.avatarAssetId ?? null,
   };
 }
 
@@ -83,6 +86,7 @@ export function validatePartnerForm(values: PartnerFormValues): PartnerValidatio
       notes: cleanText(values.notes),
       phoneNumber: cleanText(values.phoneNumber),
       avatarUri: values.avatarUri,
+      avatarAssetId: values.avatarAssetId,
     },
   };
 }

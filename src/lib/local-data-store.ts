@@ -101,6 +101,13 @@ function normalizeActivities(activities: Activity[]): Activity[] {
   });
 }
 
+function normalizeEvents(events: IntimacyEvent[]): IntimacyEvent[] {
+  return events.map((event) => ({
+    ...event,
+    mediaIds: Array.isArray(event.mediaIds) ? event.mediaIds.filter((id) => typeof id === 'string') : [],
+  }));
+}
+
 export async function readPersistedAppData(): Promise<PersistedAppData> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return DEFAULT_DATA;
@@ -108,9 +115,10 @@ export async function readPersistedAppData(): Promise<PersistedAppData> {
   try {
     const parsed = asObject(JSON.parse(raw));
     const partners = Array.isArray(parsed.partners) ? normalizePartners(parsed.partners as Partner[]) : [];
+    const events = Array.isArray(parsed.events) ? normalizeEvents(parsed.events as IntimacyEvent[]) : [];
     return {
       user: (parsed.user as UserProfile | null) ?? null,
-      events: (parsed.events as IntimacyEvent[]) ?? [],
+      events,
       partners,
       media: Array.isArray(parsed.media) ? (parsed.media as AppMedia[]) : [],
       activities: Array.isArray(parsed.activities)

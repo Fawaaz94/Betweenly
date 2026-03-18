@@ -13,7 +13,16 @@ function AppShell() {
           headerShown: false,
           contentStyle: { backgroundColor: colors.appBg },
         }}
-      />
+      >
+        <Stack.Screen
+          name="events/[id]"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'slide_from_bottom',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
+      </Stack>
     </SafeAreaView>
   );
 }

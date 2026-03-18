@@ -37,6 +37,7 @@ export type IntimacyEvent = {
   whatWorkedWell: string;
   whatToTryNext: string;
   isSharedWithPartner?: boolean;
+  mediaIds?: string[];
   createdAt: string;
   updatedAt: string;
 };

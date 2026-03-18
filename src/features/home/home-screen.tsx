@@ -165,7 +165,7 @@ export function HomeScreen() {
 
       <PrimaryButton label="Quick log event" onPress={() => router.push('/(tabs)/log')} />
 
-      <SectionTitle>Recent history</SectionTitle>
+      <SectionTitle>Recents</SectionTitle>
       {events.length === 0 ? (
         <EmptyText>No entries yet. Add your first event from Log Event.</EmptyText>
       ) : (

@@ -663,7 +663,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
             onChangeText={setDurationMinutes}
             style={styles.durationInput}
             keyboardType="number-pad"
-            placeholder="Duration  minutes"
+            placeholder="Duration"
             placeholderTextColor={colors.textMuted}
           />
         </View>

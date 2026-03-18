@@ -49,7 +49,7 @@ type EventEntryScreenProps = {
 export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
   const router = useRouter();
   const { colors, theme, themeMode } = useTheme();
-  const { saveEvent, updateEvent, user, activities, partners, events, activeLogDate } = useAppState();
+  const { saveEvent, updateEvent, user, activities, partners, events, activeLogDate, setActiveLogDate } = useAppState();
   const isEditMode = mode === 'edit' && Boolean(initialEvent);
 
   const [entryDate, setEntryDate] = useState(() =>
@@ -100,7 +100,6 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
 
   useEffect(() => {
     if (mode !== 'create') return;
-    if (!activeLogDate) return;
     const seededDate = mergeDateKeyWithCurrentTime(activeLogDate);
     setEntryDate(seededDate);
     setIosPickerValue(seededDate);
@@ -593,6 +592,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         router.replace(`/events/${updated.id}`);
       } else {
         await saveEvent(payload);
+        setActiveLogDate(null);
         router.replace('/(tabs)');
       }
     } catch {
@@ -604,6 +604,9 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
   };
 
   const closeComposer = () => {
+    if (!isEditMode) {
+      setActiveLogDate(null);
+    }
     if (router.canGoBack()) {
       router.back();
       return;

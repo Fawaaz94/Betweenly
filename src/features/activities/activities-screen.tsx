@@ -9,7 +9,7 @@ import { useAppState } from '../app/app-context';
 export function ActivitiesScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { activities, events } = useAppState();
+  const { activities, events, deleteActivity, setDefaultActivity } = useAppState();
 
   const activityEntryCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -85,6 +85,20 @@ export function ActivitiesScreen() {
           lineHeight: theme.typography.lineHeight.lg,
           fontWeight: '500',
         },
+        defaultBadge: {
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          paddingHorizontal: theme.spacing.xs,
+          paddingVertical: 2,
+          backgroundColor: colors.surfaceAlt,
+        },
+        defaultBadgeText: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.xs - 1,
+          lineHeight: theme.typography.lineHeight.xs,
+          fontWeight: '700',
+        },
         rowRight: {
           flexDirection: 'row',
           alignItems: 'center',
@@ -128,11 +142,44 @@ export function ActivitiesScreen() {
             <View key={activity.id}>
               <Pressable
                 style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
-                onLongPress={() => Alert.alert('Activity options', 'Custom activity options are coming soon.')}
+                onLongPress={() => {
+                  Alert.alert(activity.name, 'Choose an option', [
+                    {
+                      text: 'Edit',
+                      onPress: () => {
+                        router.push({ pathname: '/activities/[id]', params: { id: activity.id } });
+                      },
+                    },
+                    activity.isDefault
+                      ? {
+                          text: 'Set as default',
+                          style: 'cancel',
+                        }
+                      : {
+                          text: 'Set as default',
+                          onPress: () => {
+                            void setDefaultActivity(activity.id);
+                          },
+                        },
+                    {
+                      text: 'Delete',
+                      style: 'destructive',
+                      onPress: () => {
+                        void deleteActivity(activity.id);
+                      },
+                    },
+                    { text: 'Cancel', style: 'cancel' },
+                  ]);
+                }}
               >
                 <View style={styles.rowLeft}>
                   <Ionicons name={activity.icon} size={theme.sizing.iconMd} color={colors.textSecondary} />
                   <Text style={styles.rowTitle}>{activity.name}</Text>
+                  {activity.isDefault ? (
+                    <View style={styles.defaultBadge}>
+                      <Text style={styles.defaultBadgeText}>Default</Text>
+                    </View>
+                  ) : null}
                 </View>
                 <View style={styles.rowRight}>
                   <Text style={styles.rowMeta}>{count > 0 ? `${count}x` : ''}</Text>

@@ -32,6 +32,7 @@ const DEFAULT_DATA: PersistedAppData = {
     id: `act_default_${index + 1}`,
     name: activity.name,
     icon: activity.icon,
+    isDefault: activity.isDefault,
     createdAt: new Date(0).toISOString(),
     updatedAt: new Date(0).toISOString(),
   })),
@@ -51,6 +52,37 @@ function normalizePartner(partner: Partner): Partner {
   };
 }
 
+function normalizeActivities(activities: Activity[]): Activity[] {
+  if (activities.length === 0) return DEFAULT_DATA.activities;
+
+  const normalized = activities.map((activity) => ({
+    ...activity,
+    isDefault: Boolean(activity.isDefault),
+  }));
+
+  if (!normalized.some((activity) => activity.isDefault)) {
+    const sexIndex = normalized.findIndex((activity) => activity.name.trim().toLowerCase() === 'sex');
+    const defaultIndex = sexIndex >= 0 ? sexIndex : 0;
+    normalized[defaultIndex] = {
+      ...normalized[defaultIndex],
+      isDefault: true,
+    };
+  }
+
+  let hasSeenDefault = false;
+  return normalized.map((activity) => {
+    if (!activity.isDefault) return activity;
+    if (!hasSeenDefault) {
+      hasSeenDefault = true;
+      return activity;
+    }
+    return {
+      ...activity,
+      isDefault: false,
+    };
+  });
+}
+
 export async function readPersistedAppData(): Promise<PersistedAppData> {
   const raw = await AsyncStorage.getItem(STORAGE_KEY);
   if (!raw) return DEFAULT_DATA;
@@ -63,7 +95,9 @@ export async function readPersistedAppData(): Promise<PersistedAppData> {
       events: (parsed.events as IntimacyEvent[]) ?? [],
       partners,
       media: Array.isArray(parsed.media) ? (parsed.media as AppMedia[]) : [],
-      activities: Array.isArray(parsed.activities) ? (parsed.activities as Activity[]) : DEFAULT_DATA.activities,
+      activities: Array.isArray(parsed.activities)
+        ? normalizeActivities(parsed.activities as Activity[])
+        : DEFAULT_DATA.activities,
       cycleData: (parsed.cycleData as CycleData) ?? DEFAULT_CYCLE_DATA,
       themeMode: (parsed.themeMode as ThemeMode) ?? defaultThemeMode,
     };

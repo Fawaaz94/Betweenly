@@ -1,19 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { LabeledInput } from '../../components/forms/labeled-input';
-import { Label, PrimaryButton, ScreenContainer, ScreenTitle } from '../../components/ui/primitives';
+import { EmptyText, GhostButton, Label, PrimaryButton, ScreenContainer, ScreenTitle } from '../../components/ui/primitives';
 import { ACTIVITY_ICON_OPTIONS, type ActivityIconName } from '../../constants/activities';
 import { useTheme } from '../../theme/use-theme';
 import { useAppState } from '../app/app-context';
 
-export function AddActivityScreen() {
+export function EditActivityScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { activities, saveActivity } = useAppState();
-  const [name, setName] = useState('');
-  const [selectedIcon, setSelectedIcon] = useState<ActivityIconName>(ACTIVITY_ICON_OPTIONS[0].name);
+  const { activities, updateActivity } = useAppState();
+  const activity = activities.find((item) => item.id === id);
+  const [name, setName] = useState(activity?.name ?? '');
+  const [selectedIcon, setSelectedIcon] = useState<ActivityIconName>(activity?.icon ?? ACTIVITY_ICON_OPTIONS[0].name);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -59,6 +61,16 @@ export function AddActivityScreen() {
     [colors, theme],
   );
 
+  if (!activity) {
+    return (
+      <ScreenContainer>
+        <ScreenTitle title="Activity not found" showBackButton />
+        <EmptyText>This activity was removed or not available.</EmptyText>
+        <GhostButton label="Back" onPress={() => router.replace('/activities')} />
+      </ScreenContainer>
+    );
+  }
+
   const handleSave = async () => {
     if (isSaving) return;
 
@@ -69,7 +81,9 @@ export function AddActivityScreen() {
       return;
     }
 
-    const hasDuplicate = activities.some((activity) => activity.name.trim().toLowerCase() === trimmedName.toLowerCase());
+    const hasDuplicate = activities.some(
+      (item) => item.id !== activity.id && item.name.trim().toLowerCase() === trimmedName.toLowerCase(),
+    );
     if (hasDuplicate) {
       setErrorMessage('This activity already exists.');
       return;
@@ -77,7 +91,7 @@ export function AddActivityScreen() {
 
     try {
       setIsSaving(true);
-      await saveActivity({ name: trimmedName, icon: selectedIcon, isDefault: false });
+      await updateActivity(activity.id, { name: trimmedName, icon: selectedIcon });
       router.back();
     } catch {
       setIsSaving(false);
@@ -87,7 +101,7 @@ export function AddActivityScreen() {
 
   return (
     <ScreenContainer>
-      <ScreenTitle title="Add Activity" showBackButton />
+      <ScreenTitle title="Edit Activity" showBackButton />
 
       <LabeledInput
         label="Activity Name"

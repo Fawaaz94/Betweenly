@@ -46,6 +46,7 @@ type AppContextValue = {
   saveActivity: (activity: CreateActivityInput) => Promise<Activity>;
   updateActivity: (id: string, updates: UpdateActivityInput) => Promise<Activity | null>;
   deleteActivity: (id: string) => Promise<void>;
+  setDefaultActivity: (id: string) => Promise<void>;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -280,13 +281,24 @@ export function AppProvider({ children }: PropsWithChildren) {
   const saveActivity = useCallback(
     async (input: CreateActivityInput) => {
       const now = new Date().toISOString();
+      const shouldBeDefault = activities.length === 0 ? true : input.isDefault;
       const saved: Activity = {
         ...input,
+        isDefault: shouldBeDefault,
         id: createActivityId(),
         createdAt: now,
         updatedAt: now,
       };
-      const nextActivities = [...activities, saved].sort((a, b) => a.name.localeCompare(b.name));
+      const nextActivities = [...activities, saved]
+        .map((activity) =>
+          saved.isDefault && activity.id !== saved.id
+            ? {
+                ...activity,
+                isDefault: false,
+              }
+            : activity,
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
       setActivities(nextActivities);
       await persist({ activities: nextActivities });
       return saved;
@@ -304,9 +316,26 @@ export function AppProvider({ children }: PropsWithChildren) {
         ...updates,
         updatedAt: new Date().toISOString(),
       };
-      const nextActivities = activities
+      const nextActivitiesRaw = activities
         .map((activity) => (activity.id === id ? updated : activity))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .map((activity) =>
+          updated.isDefault && activity.id !== updated.id
+            ? {
+                ...activity,
+                isDefault: false,
+              }
+            : activity,
+        );
+
+      const hasDefault = nextActivitiesRaw.some((activity) => activity.isDefault);
+      const nextActivities = (hasDefault
+        ? nextActivitiesRaw
+        : nextActivitiesRaw.map((activity, index) => ({
+            ...activity,
+            isDefault: index === 0,
+          }))
+      ).sort((a, b) => a.name.localeCompare(b.name));
+
       setActivities(nextActivities);
       await persist({ activities: nextActivities });
       return updated;
@@ -316,7 +345,29 @@ export function AppProvider({ children }: PropsWithChildren) {
 
   const deleteActivity = useCallback(
     async (id: string) => {
-      const nextActivities = activities.filter((activity) => activity.id !== id);
+      const nextActivitiesRaw = activities.filter((activity) => activity.id !== id);
+      const deletedWasDefault = activities.some((activity) => activity.id === id && activity.isDefault);
+
+      const nextActivities =
+        deletedWasDefault && nextActivitiesRaw.length > 0
+          ? nextActivitiesRaw.map((activity, index) => ({
+              ...activity,
+              isDefault: index === 0 ? true : activity.isDefault,
+            }))
+          : nextActivitiesRaw;
+
+      setActivities(nextActivities);
+      await persist({ activities: nextActivities });
+    },
+    [activities, persist],
+  );
+
+  const setDefaultActivity = useCallback(
+    async (id: string) => {
+      const nextActivities = activities.map((activity) => ({
+        ...activity,
+        isDefault: activity.id === id,
+      }));
       setActivities(nextActivities);
       await persist({ activities: nextActivities });
     },
@@ -350,6 +401,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       saveActivity,
       updateActivity,
       deleteActivity,
+      setDefaultActivity,
     }),
     [
       activities,
@@ -367,6 +419,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       saveMedia,
       saveActivity,
       savePartner,
+      setDefaultActivity,
       setThemeMode,
       themeMode,
       toggleThemeMode,

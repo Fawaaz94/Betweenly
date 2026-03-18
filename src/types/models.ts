@@ -80,6 +80,7 @@ export type Activity = {
   id: string;
   name: string;
   icon: ActivityIconName;
+  isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 };

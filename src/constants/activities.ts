@@ -16,9 +16,9 @@ export const ACTIVITY_ICON_OPTIONS = [
 export type ActivityIconName = (typeof ACTIVITY_ICON_OPTIONS)[number]['name'];
 
 export const DEFAULT_ACTIVITY_TEMPLATES = [
-  { name: 'Anal', icon: 'sparkles-outline' },
-  { name: 'Hand Job', icon: 'hand-left-outline' },
-  { name: 'Masturbation', icon: 'hand-right-outline' },
-  { name: 'Oral', icon: 'rose-outline' },
-  { name: 'Sex', icon: 'heart-outline' },
+  { name: 'Anal', icon: 'sparkles-outline', isDefault: false },
+  { name: 'Hand Job', icon: 'hand-left-outline', isDefault: false },
+  { name: 'Masturbation', icon: 'hand-right-outline', isDefault: false },
+  { name: 'Oral', icon: 'rose-outline', isDefault: false },
+  { name: 'Sex', icon: 'heart-outline', isDefault: true },
 ] as const;

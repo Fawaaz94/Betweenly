@@ -4,6 +4,7 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export type PartnerFormValues = {
   name: string;
+  isDefault: boolean;
   birthday: string;
   nationality: string;
   instagram: string;
@@ -35,6 +36,7 @@ function normalizeInstagram(value: string) {
 export function createDefaultPartnerFormValues(): PartnerFormValues {
   return {
     name: '',
+    isDefault: false,
     birthday: '',
     nationality: '',
     instagram: '',
@@ -48,6 +50,7 @@ export function createDefaultPartnerFormValues(): PartnerFormValues {
 export function createPartnerFormValuesFromPartner(partner: Partner): PartnerFormValues {
   return {
     name: partner.name,
+    isDefault: partner.isDefault,
     birthday: partner.birthday ?? '',
     nationality: partner.nationality ?? '',
     instagram: partner.instagram,
@@ -80,6 +83,7 @@ export function validatePartnerForm(values: PartnerFormValues): PartnerValidatio
     success: true,
     data: {
       name,
+      isDefault: values.isDefault,
       birthday: birthday || null,
       nationality,
       instagram: normalizeInstagram(values.instagram),

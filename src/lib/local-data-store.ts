@@ -47,9 +47,27 @@ function asObject(value: unknown) {
 function normalizePartner(partner: Partner): Partner {
   return {
     ...partner,
+    isDefault: Boolean(partner.isDefault),
     avatarUri: partner.avatarUri ?? null,
     avatarAssetId: partner.avatarAssetId ?? null,
   };
+}
+
+function normalizePartners(partners: Partner[]): Partner[] {
+  const normalized = partners.map(normalizePartner);
+
+  let hasSeenDefault = false;
+  return normalized.map((partner) => {
+    if (!partner.isDefault) return partner;
+    if (!hasSeenDefault) {
+      hasSeenDefault = true;
+      return partner;
+    }
+    return {
+      ...partner,
+      isDefault: false,
+    };
+  });
 }
 
 function normalizeActivities(activities: Activity[]): Activity[] {
@@ -89,7 +107,7 @@ export async function readPersistedAppData(): Promise<PersistedAppData> {
 
   try {
     const parsed = asObject(JSON.parse(raw));
-    const partners = Array.isArray(parsed.partners) ? (parsed.partners as Partner[]).map(normalizePartner) : [];
+    const partners = Array.isArray(parsed.partners) ? normalizePartners(parsed.partners as Partner[]) : [];
     return {
       user: (parsed.user as UserProfile | null) ?? null,
       events: (parsed.events as IntimacyEvent[]) ?? [],

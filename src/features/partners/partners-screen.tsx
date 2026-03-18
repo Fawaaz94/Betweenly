@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Alert, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { countryCodeToFlagEmoji } from '../../constants/countries';
+import { ActionMenuModal } from '../../components/ui/action-menu-modal';
 import { EmptyText, NoteText, ScreenContainer, ScreenTitle } from '../../components/ui/primitives';
 import { useTheme } from '../../theme/use-theme';
 import { useAppState } from '../app/app-context';
@@ -61,14 +62,20 @@ function formatEventDateTime(iso: string) {
 export function PartnersScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { partners, events } = useAppState();
+  const { partners, events, deletePartner, setDefaultPartner } = useAppState();
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
+  const [actionPartnerId, setActionPartnerId] = useState<string | null>(null);
+  const longPressPartnerIdRef = useRef<string | null>(null);
   const [entriesModalVisible, setEntriesModalVisible] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<'all' | string>('all');
 
   const selectedPartner = useMemo(
     () => partners.find((partner) => partner.id === selectedPartnerId) ?? null,
     [partners, selectedPartnerId],
+  );
+  const actionPartner = useMemo(
+    () => partners.find((partner) => partner.id === actionPartnerId) ?? null,
+    [partners, actionPartnerId],
   );
 
   const entryCountByPartnerName = useMemo(() => {
@@ -177,6 +184,22 @@ export function PartnersScreen() {
           color: colors.textSecondary,
           fontSize: theme.typography.fontSize.sm,
           lineHeight: theme.typography.lineHeight.sm,
+        },
+        defaultBadge: {
+          marginTop: 4,
+          alignSelf: 'flex-start',
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surfaceAlt,
+          paddingHorizontal: theme.spacing.xs,
+          paddingVertical: 2,
+        },
+        defaultBadgeText: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.xs - 1,
+          lineHeight: theme.typography.lineHeight.xs,
+          fontWeight: '700',
         },
         partnerRight: {
           flexDirection: 'row',
@@ -525,9 +548,17 @@ export function PartnersScreen() {
             key={partner.id}
             style={({ pressed }) => [styles.listCard, pressed ? styles.listCardPressed : null]}
             onPress={() => {
+              if (longPressPartnerIdRef.current === partner.id) {
+                longPressPartnerIdRef.current = null;
+                return;
+              }
               setSelectedMonth('all');
               setEntriesModalVisible(false);
               setSelectedPartnerId(partner.id);
+            }}
+            onLongPress={() => {
+              longPressPartnerIdRef.current = partner.id;
+              setActionPartnerId(partner.id);
             }}
           >
             <View style={styles.partnerLeft}>
@@ -543,6 +574,11 @@ export function PartnersScreen() {
                   {`${partner.name} ${countryCodeToFlagEmoji(partner.nationality)}`}
                 </Text>
                 <Text style={styles.partnerMeta}>{partner.birthday ? formatBirthday(partner.birthday) : 'Birthday not set'}</Text>
+                {partner.isDefault ? (
+                  <View style={styles.defaultBadge}>
+                    <Text style={styles.defaultBadgeText}>Default</Text>
+                  </View>
+                ) : null}
               </View>
             </View>
 
@@ -769,6 +805,57 @@ export function PartnersScreen() {
           </View>
         </View>
       </Modal>
+
+      <ActionMenuModal
+        visible={Boolean(actionPartner)}
+        title={actionPartner ? actionPartner.name : 'Partner'}
+        onClose={() => {
+          longPressPartnerIdRef.current = null;
+          setActionPartnerId(null);
+        }}
+        options={
+          actionPartner
+            ? [
+                {
+                  key: 'default',
+                  label: 'Set as default',
+                  disabled: actionPartner.isDefault,
+                  onPress: () => {
+                    void setDefaultPartner(actionPartner.id);
+                  },
+                },
+                {
+                  key: 'edit',
+                  label: 'Edit',
+                  onPress: () => {
+                    router.push({ pathname: '/partner/[id]', params: { id: actionPartner.id } });
+                  },
+                },
+                {
+                  key: 'delete',
+                  label: 'Delete',
+                  destructive: true,
+                  onPress: () => {
+                    Alert.alert('Delete partner?', 'This will remove the partner from this device.', [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: () => {
+                          void deletePartner(actionPartner.id);
+                          if (selectedPartnerId === actionPartner.id) {
+                            setSelectedPartnerId(null);
+                            setEntriesModalVisible(false);
+                          }
+                        },
+                      },
+                    ]);
+                  },
+                },
+              ]
+            : []
+        }
+      />
     </ScreenContainer>
   );
 }

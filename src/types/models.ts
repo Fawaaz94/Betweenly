@@ -50,6 +50,7 @@ export type UpdateEventInput = UpdateIntimacyEventInput;
 export type Partner = {
   id: string;
   name: string;
+  isDefault: boolean;
   birthday: string | null;
   nationality: string;
   instagram: string;

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
 import { defaultThemeMode, getThemeColors, type ThemeColors, type ThemeMode } from '../../constants/theme';
 import { DEFAULT_CYCLE_DATA, readPersistedAppData, writePersistedAppData, type PersistedAppData } from '../../lib/local-data-store';
+import { toDateInput, toTimeInput } from '../../lib/date';
 import type {
   Activity,
   AppMedia,
@@ -41,12 +42,21 @@ type AppContextValue = {
   savePartner: (partner: CreatePartnerInput) => Promise<Partner>;
   updatePartner: (id: string, updates: UpdatePartnerInput) => Promise<Partner | null>;
   deletePartner: (id: string) => Promise<void>;
+  setDefaultPartner: (id: string) => Promise<void>;
   saveMedia: (media: CreateAppMediaInput) => Promise<AppMedia>;
   deleteMedia: (id: string) => Promise<void>;
   saveActivity: (activity: CreateActivityInput) => Promise<Activity>;
   updateActivity: (id: string, updates: UpdateActivityInput) => Promise<Activity | null>;
   deleteActivity: (id: string) => Promise<void>;
   setDefaultActivity: (id: string) => Promise<void>;
+  quickCounterIncrement: () => Promise<{ ok: true; eventId: string } | { ok: false; reason: 'missing_defaults' }>;
+  quickCounterDecrement: () => Promise<{ ok: true; eventId: string } | { ok: false; reason: 'none' }>;
+  quickCounterUndoAvailable: boolean;
+};
+
+type QuickCounterUndoItem = {
+  eventId: string;
+  dayKey: string;
 };
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -74,6 +84,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [media, setMedia] = useState<AppMedia[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [quickCounterUndoStack, setQuickCounterUndoStack] = useState<QuickCounterUndoItem[]>([]);
   const [cycleData, setCycleData] = useState<CycleData>(DEFAULT_CYCLE_DATA);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(defaultThemeMode);
 
@@ -168,6 +179,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       const now = new Date().toISOString();
       const saved: IntimacyEvent = {
         ...input,
+        toysUsed: input.toysUsed.trim() || 'Protection: Not used',
         id: createEventId(),
         createdAt: now,
         updatedAt: now,
@@ -208,6 +220,70 @@ export function AppProvider({ children }: PropsWithChildren) {
     [events, persist],
   );
 
+  const quickCounterIncrement = useCallback(async () => {
+    const defaultPartner = partners.find((partner) => partner.isDefault) ?? null;
+    const defaultActivity = activities.find((activity) => activity.isDefault) ?? null;
+    if (!defaultPartner || !defaultActivity) {
+      return { ok: false as const, reason: 'missing_defaults' as const };
+    }
+
+    const now = new Date();
+    const dayKey = toDateInput(now);
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    const dateTimeStart = `${dayKey}T${toTimeInput(now)}:${seconds}`;
+
+    const saved = await saveEvent({
+      ownerUserId: user?.email ?? 'local_user',
+      eventType: 'partnered',
+      partnerName: defaultPartner.name,
+      dateTimeStart,
+      dateTimeEnd: null,
+      durationMinutes: 0,
+      location: 'Quick counter',
+      overallRating: 4,
+      emotionalRating: 4,
+      notes: '',
+      positions: defaultActivity.name,
+      toysUsed: '',
+      whatWorkedWell: '',
+      whatToTryNext: '',
+      isSharedWithPartner: false,
+    });
+
+    setQuickCounterUndoStack((previous) => [
+      ...previous.filter((entry) => entry.dayKey === dayKey),
+      { eventId: saved.id, dayKey },
+    ]);
+
+    return { ok: true as const, eventId: saved.id };
+  }, [activities, partners, saveEvent, user?.email]);
+
+  const quickCounterDecrement = useCallback(async () => {
+    const dayKey = toDateInput(new Date());
+    const todaysEntries = quickCounterUndoStack.filter((entry) => entry.dayKey === dayKey);
+    const nonTodayEntries = quickCounterUndoStack.filter((entry) => entry.dayKey !== dayKey);
+
+    for (let index = todaysEntries.length - 1; index >= 0; index -= 1) {
+      const candidateId = todaysEntries[index]?.eventId;
+      const eligibleEvent = events.find((event) => event.id === candidateId && event.dateTimeStart.startsWith(dayKey));
+      if (!eligibleEvent) continue;
+
+      await deleteEvent(candidateId);
+      setQuickCounterUndoStack([...nonTodayEntries, ...todaysEntries.slice(0, index)]);
+      return { ok: true as const, eventId: candidateId };
+    }
+
+    setQuickCounterUndoStack(nonTodayEntries);
+    return { ok: false as const, reason: 'none' as const };
+  }, [deleteEvent, events, quickCounterUndoStack]);
+
+  const quickCounterUndoAvailable = useMemo(() => {
+    const dayKey = toDateInput(new Date());
+    return quickCounterUndoStack.some(
+      (entry) => entry.dayKey === dayKey && events.some((event) => event.id === entry.eventId && event.dateTimeStart.startsWith(dayKey)),
+    );
+  }, [events, quickCounterUndoStack]);
+
   const savePartner = useCallback(
     async (input: CreatePartnerInput) => {
       const now = new Date().toISOString();
@@ -217,7 +293,16 @@ export function AppProvider({ children }: PropsWithChildren) {
         createdAt: now,
         updatedAt: now,
       };
-      const nextPartners = [...partners, saved].sort((a, b) => a.name.localeCompare(b.name));
+      const nextPartners = [...partners, saved]
+        .map((partner) =>
+          saved.isDefault && partner.id !== saved.id
+            ? {
+                ...partner,
+                isDefault: false,
+              }
+            : partner,
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
       setPartners(nextPartners);
       await persist({ partners: nextPartners });
       return saved;
@@ -235,7 +320,17 @@ export function AppProvider({ children }: PropsWithChildren) {
         ...updates,
         updatedAt: new Date().toISOString(),
       };
-      const nextPartners = partners.map((partner) => (partner.id === id ? updated : partner)).sort((a, b) => a.name.localeCompare(b.name));
+      const nextPartners = partners
+        .map((partner) => (partner.id === id ? updated : partner))
+        .map((partner) =>
+          updated.isDefault && partner.id !== updated.id
+            ? {
+                ...partner,
+                isDefault: false,
+              }
+            : partner,
+        )
+        .sort((a, b) => a.name.localeCompare(b.name));
       setPartners(nextPartners);
       await persist({ partners: nextPartners });
       return updated;
@@ -246,6 +341,18 @@ export function AppProvider({ children }: PropsWithChildren) {
   const deletePartner = useCallback(
     async (id: string) => {
       const nextPartners = partners.filter((partner) => partner.id !== id);
+      setPartners(nextPartners);
+      await persist({ partners: nextPartners });
+    },
+    [partners, persist],
+  );
+
+  const setDefaultPartner = useCallback(
+    async (id: string) => {
+      const nextPartners = partners.map((partner) => ({
+        ...partner,
+        isDefault: partner.id === id,
+      }));
       setPartners(nextPartners);
       await persist({ partners: nextPartners });
     },
@@ -396,12 +503,16 @@ export function AppProvider({ children }: PropsWithChildren) {
       savePartner,
       updatePartner,
       deletePartner,
+      setDefaultPartner,
       saveMedia,
       deleteMedia,
       saveActivity,
       updateActivity,
       deleteActivity,
       setDefaultActivity,
+      quickCounterIncrement,
+      quickCounterDecrement,
+      quickCounterUndoAvailable,
     }),
     [
       activities,
@@ -415,10 +526,14 @@ export function AppProvider({ children }: PropsWithChildren) {
       isBootstrapping,
       media,
       partners,
+      quickCounterDecrement,
+      quickCounterIncrement,
+      quickCounterUndoAvailable,
       saveEvent,
       saveMedia,
       saveActivity,
       savePartner,
+      setDefaultPartner,
       setDefaultActivity,
       setThemeMode,
       themeMode,

@@ -52,6 +52,8 @@ type AppContextValue = {
   quickCounterIncrement: () => Promise<{ ok: true; eventId: string } | { ok: false; reason: 'missing_defaults' }>;
   quickCounterDecrement: () => Promise<{ ok: true; eventId: string } | { ok: false; reason: 'none' }>;
   quickCounterUndoAvailable: boolean;
+  activeLogDate: string | null;
+  setActiveLogDate: (dateKey: string | null) => void;
 };
 
 type QuickCounterUndoItem = {
@@ -85,6 +87,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [media, setMedia] = useState<AppMedia[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [quickCounterUndoStack, setQuickCounterUndoStack] = useState<QuickCounterUndoItem[]>([]);
+  const [activeLogDate, setActiveLogDateState] = useState<string | null>(null);
   const [cycleData, setCycleData] = useState<CycleData>(DEFAULT_CYCLE_DATA);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(defaultThemeMode);
 
@@ -283,6 +286,10 @@ export function AppProvider({ children }: PropsWithChildren) {
       (entry) => entry.dayKey === dayKey && events.some((event) => event.id === entry.eventId && event.dateTimeStart.startsWith(dayKey)),
     );
   }, [events, quickCounterUndoStack]);
+
+  const setActiveLogDate = useCallback((dateKey: string | null) => {
+    setActiveLogDateState(dateKey);
+  }, []);
 
   const savePartner = useCallback(
     async (input: CreatePartnerInput) => {
@@ -513,8 +520,11 @@ export function AppProvider({ children }: PropsWithChildren) {
       quickCounterIncrement,
       quickCounterDecrement,
       quickCounterUndoAvailable,
+      activeLogDate,
+      setActiveLogDate,
     }),
     [
+      activeLogDate,
       activities,
       createProfile,
       cycleData,
@@ -535,6 +545,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       savePartner,
       setDefaultPartner,
       setDefaultActivity,
+      setActiveLogDate,
       setThemeMode,
       themeMode,
       toggleThemeMode,

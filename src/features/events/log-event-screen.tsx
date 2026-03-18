@@ -27,6 +27,16 @@ function parseIsoDate(iso: string) {
   return Number.isNaN(+parsed) ? new Date() : parsed;
 }
 
+function mergeDateKeyWithCurrentTime(dateKey: string | null) {
+  if (!dateKey) return new Date();
+  const [year, month, day] = dateKey.split('-').map((value) => Number.parseInt(value, 10));
+  if (!year || !month || !day) return new Date();
+
+  const now = new Date();
+  now.setFullYear(year, month - 1, day);
+  return now;
+}
+
 function isProtectionUsedValue(value: string) {
   return !value.toLowerCase().includes('not used');
 }
@@ -39,12 +49,16 @@ type EventEntryScreenProps = {
 export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
   const router = useRouter();
   const { colors, theme, themeMode } = useTheme();
-  const { saveEvent, updateEvent, user, activities, partners, events } = useAppState();
+  const { saveEvent, updateEvent, user, activities, partners, events, activeLogDate } = useAppState();
   const isEditMode = mode === 'edit' && Boolean(initialEvent);
 
-  const [entryDate, setEntryDate] = useState(() => (initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : new Date()));
+  const [entryDate, setEntryDate] = useState(() =>
+    initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : mergeDateKeyWithCurrentTime(activeLogDate),
+  );
   const [pickerMode, setPickerMode] = useState<PickerMode>(null);
-  const [iosPickerValue, setIosPickerValue] = useState(() => (initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : new Date()));
+  const [iosPickerValue, setIosPickerValue] = useState(() =>
+    initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : mergeDateKeyWithCurrentTime(activeLogDate),
+  );
   const [durationMinutes, setDurationMinutes] = useState(String(initialEvent?.durationMinutes ?? 45));
   const [notes, setNotes] = useState(initialEvent?.notes ?? '');
   const [noteHeight, setNoteHeight] = useState(120);
@@ -83,6 +97,14 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     const defaultActivityId = getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId);
     setSelectedActivityId(defaultActivityId);
   }, [activities, activityIds, isDefaultByActivityId, mode, selectedActivityId, sexActivityId]);
+
+  useEffect(() => {
+    if (mode !== 'create') return;
+    if (!activeLogDate) return;
+    const seededDate = mergeDateKeyWithCurrentTime(activeLogDate);
+    setEntryDate(seededDate);
+    setIosPickerValue(seededDate);
+  }, [activeLogDate, mode]);
 
   useEffect(() => {
     if (!isEditMode || !initialEvent) return;

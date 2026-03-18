@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MonthCalendar } from '../../components/calendar/month-calendar';
@@ -39,7 +39,7 @@ function getSearchableText(event: IntimacyEvent) {
 export function CalendarScreen() {
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { events } = useAppState();
+  const { events, setActiveLogDate } = useAppState();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(toDateInput(new Date()));
   const [searchOpen, setSearchOpen] = useState(false);
@@ -71,6 +71,10 @@ export function CalendarScreen() {
     : selectedDate === todayKey
       ? 'Today'
       : formatSelectedDateTitle(selectedDate);
+
+  useEffect(() => {
+    setActiveLogDate(selectedDate);
+  }, [selectedDate, setActiveLogDate]);
 
   const styles = useMemo(
     () =>

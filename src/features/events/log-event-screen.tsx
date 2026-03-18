@@ -530,8 +530,8 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         }
         router.replace(`/events/${updated.id}`);
       } else {
-        const saved = await saveEvent(payload);
-        router.replace(`/events/${saved.id}`);
+        await saveEvent(payload);
+        router.replace('/(tabs)');
       }
     } catch {
       setErrorMessage('Unable to save. Please try again.');

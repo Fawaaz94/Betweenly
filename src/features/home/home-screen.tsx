@@ -163,8 +163,6 @@ export function HomeScreen() {
         <NoteText>Set a default partner and default activity in Settings to enable quick counter logging.</NoteText>
       ) : null}
 
-      <PrimaryButton label="Quick log event" onPress={() => router.push('/(tabs)/log')} />
-
       <SectionTitle>Recents</SectionTitle>
       {events.length === 0 ? (
         <EmptyText>No entries yet. Add your first event from Log Event.</EmptyText>

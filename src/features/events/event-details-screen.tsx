@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleProp, StyleSheet, Text, type TextStyle, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SlideUpSheet } from '../../components/ui/slide-up-sheet';
 import { formatDateTime } from '../../lib/date';
 import { useTheme } from '../../theme/use-theme';
@@ -16,37 +16,26 @@ function getExtension(uri: string, fileName: string | null | undefined) {
   return ext && ext !== filePart ? ext : 'jpg';
 }
 
-function isTruthyText(value: string | null | undefined) {
-  return Boolean(value && value.trim());
-}
-
-function DetailRow({
-  label,
-  value,
-  labelStyle,
-  valueStyle,
-}: {
-  label: string;
-  value: string;
-  labelStyle: StyleProp<TextStyle>;
-  valueStyle: StyleProp<TextStyle>;
-}) {
-  return (
-    <View style={{ gap: 2 }}>
-      <Text style={labelStyle}>{label}</Text>
-      <Text style={valueStyle}>{value}</Text>
-    </View>
-  );
+function toProtectionLabel(value: string) {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return 'Not used';
+  if (normalized.includes('not used')) return 'Not used';
+  if (normalized.includes('used')) return 'Used';
+  return value;
 }
 
 export function EventDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { colors, theme } = useTheme();
-  const { events, media, saveMedia, updateEvent, deleteEvent } = useAppState();
+  const { events, media, partners, saveMedia, updateEvent } = useAppState();
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
 
   const event = events.find((item) => item.id === id);
+  const eventPartner = useMemo(
+    () => partners.find((partner) => partner.name.trim().toLowerCase() === (event?.partnerName ?? '').trim().toLowerCase()) ?? null,
+    [event?.partnerName, partners],
+  );
   const eventMedia = useMemo(() => {
     if (!event) return [];
     const byId = new Map(media.map((item) => [item.id, item]));
@@ -64,106 +53,126 @@ export function EventDetailsScreen() {
           justifyContent: 'space-between',
           gap: theme.spacing.xs,
         },
-        headerButton: {
-          width: 38,
-          height: 38,
-          borderRadius: theme.radius.pill,
-          borderWidth: 1,
-          borderColor: colors.borderMuted,
-          backgroundColor: colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        headerActionRow: {
+        actionGroup: {
           flexDirection: 'row',
           alignItems: 'center',
           gap: theme.spacing.xs,
         },
-        headerTitle: {
-          color: colors.textPrimary,
-          fontSize: theme.typography.fontSize.lg,
-          lineHeight: theme.typography.lineHeight.lg,
-          fontWeight: '700',
+        iconButton: {
+          width: 42,
+          height: 42,
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.surface,
         },
         body: {
           paddingHorizontal: theme.spacing.lg,
           paddingBottom: theme.spacing.xxl,
-          gap: theme.spacing.md,
         },
-        sectionCard: {
-          borderWidth: 1,
-          borderColor: colors.borderMuted,
-          borderRadius: theme.radius.xl,
-          backgroundColor: colors.surface,
-          paddingHorizontal: theme.spacing.md,
-          paddingVertical: theme.spacing.md,
-          gap: theme.spacing.sm,
+        title: {
+          marginTop: theme.spacing.xs,
+          color: colors.accent,
+          fontSize: theme.typography.fontSize.xxl,
+          lineHeight: theme.typography.lineHeight.xxl,
+          fontWeight: '700',
         },
-        sectionTitle: {
-          color: colors.textPrimary,
+        dateText: {
+          color: colors.textSecondary,
           fontSize: theme.typography.fontSize.md,
           lineHeight: theme.typography.lineHeight.md,
+          fontWeight: '500',
+        },
+        partnerChip: {
+          marginTop: theme.spacing.lg,
+          alignSelf: 'flex-start',
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          borderRadius: theme.radius.pill,
+          backgroundColor: colors.surface,
+          paddingVertical: theme.spacing.xs,
+          paddingHorizontal: theme.spacing.sm,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: theme.spacing.xs,
+        },
+        avatar: {
+          width: 30,
+          height: 30,
+          borderRadius: 15,
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          backgroundColor: colors.surfaceAlt,
+        },
+        avatarImage: {
+          width: '100%',
+          height: '100%',
+        },
+        avatarText: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.xs,
           fontWeight: '700',
+        },
+        partnerText: {
+          color: colors.textPrimary,
+          fontSize: theme.typography.fontSize.lg,
+          lineHeight: theme.typography.lineHeight.lg,
+          fontWeight: '500',
+        },
+        rowWrap: {
+          marginTop: theme.spacing.lg,
+          gap: theme.spacing.md,
+        },
+        detailRow: {
+          flexDirection: 'row',
+          alignItems: 'flex-start',
+          gap: theme.spacing.sm,
         },
         detailLabel: {
           color: colors.textMuted,
-          fontSize: theme.typography.fontSize.xs,
-          fontWeight: '600',
+          fontSize: theme.typography.fontSize.md,
+          lineHeight: theme.typography.lineHeight.md,
+          fontWeight: '500',
         },
         detailValue: {
           color: colors.textPrimary,
-          fontSize: theme.typography.fontSize.md,
+          fontSize: theme.typography.fontSize.xl,
+          lineHeight: theme.typography.lineHeight.xl,
           fontWeight: '500',
         },
-        sectionText: {
+        detailTextWrap: {
+          flex: 1,
+          gap: 2,
+        },
+        imagesSection: {
+          marginTop: theme.spacing.xl,
+          gap: theme.spacing.sm,
+        },
+        imagesTitle: {
           color: colors.textSecondary,
-          fontSize: theme.typography.fontSize.sm,
-          lineHeight: theme.typography.lineHeight.sm,
+          fontSize: theme.typography.fontSize.md,
+          lineHeight: theme.typography.lineHeight.md,
+          fontWeight: '600',
         },
         mediaScroll: {
-          marginHorizontal: -theme.spacing.xs,
+          paddingRight: theme.spacing.sm,
         },
         mediaTile: {
-          width: 124,
-          height: 124,
+          width: 120,
+          height: 120,
           borderRadius: theme.radius.lg,
           borderWidth: 1,
           borderColor: colors.borderMuted,
           overflow: 'hidden',
-          marginHorizontal: theme.spacing.xs,
+          marginRight: theme.spacing.sm,
           backgroundColor: colors.surfaceAlt,
         },
         mediaImage: {
           width: '100%',
           height: '100%',
-        },
-        actionRow: {
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: theme.spacing.xs,
-        },
-        actionButton: {
-          flex: 1,
-          minHeight: theme.sizing.buttonHeight,
-          borderRadius: theme.radius.pill,
-          borderWidth: 1,
-          borderColor: colors.borderMuted,
-          backgroundColor: colors.surface,
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
-        actionButtonDanger: {
-          borderColor: colors.danger,
-          backgroundColor: colors.surfaceAlt,
-        },
-        actionText: {
-          color: colors.accent,
-          fontSize: theme.typography.fontSize.md,
-          lineHeight: theme.typography.lineHeight.md,
-          fontWeight: '700',
-        },
-        actionDangerText: {
-          color: colors.danger,
         },
       }),
     [colors, theme],
@@ -226,79 +235,87 @@ export function EventDetailsScreen() {
     return (
       <SlideUpSheet onClose={handleClose}>
         <View style={styles.body}>
-          <Text style={styles.sectionTitle}>Event not found</Text>
-          <Text style={styles.sectionText}>This entry was removed or no longer exists.</Text>
+          <Text style={styles.title}>Event not found</Text>
         </View>
       </SlideUpSheet>
     );
   }
 
+  const noteValue = event.notes.trim();
+  const partnerName = event.partnerName?.trim() ?? '';
+  const hasPartner = Boolean(partnerName);
+  const hasNotes = Boolean(noteValue);
+  const hasImages = eventMedia.length > 0;
+
   return (
     <SlideUpSheet onClose={handleClose}>
       <View style={styles.header}>
-        <Pressable style={styles.headerButton} onPress={handleClose}>
-          <Ionicons name="close" size={theme.sizing.iconMd} color={colors.textPrimary} />
+        <Pressable style={styles.iconButton} onPress={handleClose}>
+          <Ionicons name="close" size={theme.sizing.iconMd} color={colors.textMuted} />
         </Pressable>
-        <Text style={styles.headerTitle}>Event Overview</Text>
-        <View style={styles.headerActionRow}>
-          <Pressable
-            style={styles.headerButton}
-            onPress={() => void handleAddImage()}
-            accessibilityRole="button"
-            accessibilityLabel="Add image"
-          >
+
+        <View style={styles.actionGroup}>
+          <Pressable style={styles.iconButton} onPress={() => void handleAddImage()}>
             <Ionicons
               name={isUploadingMedia ? 'hourglass-outline' : 'image-outline'}
               size={theme.sizing.iconMd}
-              color={colors.accent}
+              color={colors.textSecondary}
             />
           </Pressable>
-          <Pressable style={styles.headerButton} onPress={() => router.replace(`/events/edit/${event.id}`)}>
+          <Pressable style={styles.iconButton} onPress={() => router.replace(`/events/edit/${event.id}`)}>
             <Ionicons name="create-outline" size={theme.sizing.iconMd} color={colors.accent} />
           </Pressable>
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-        <View style={styles.sectionCard}>
-          <DetailRow label="Date & time" value={formatDateTime(event.dateTimeStart)} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Type" value={event.eventType === 'partnered' ? 'Partnered' : 'Solo'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Partner" value={event.partnerName || '-'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Activity" value={event.positions || '-'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Protection" value={event.toysUsed || 'Protection: Not used'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Duration" value={`${event.durationMinutes} minutes`} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Location" value={event.location || '-'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Overall rating" value={`${event.overallRating}/5`} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Emotional rating" value={`${event.emotionalRating}/5`} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="Visibility" value={event.isSharedWithPartner ? 'Shared' : 'Private'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
-          <DetailRow label="End time" value={event.dateTimeEnd ? formatDateTime(event.dateTimeEnd) : '-'} labelStyle={styles.detailLabel} valueStyle={styles.detailValue} />
+        <Text style={styles.title}>{event.positions || 'Activity'}</Text>
+        <Text style={styles.dateText}>{formatDateTime(event.dateTimeStart)}</Text>
+
+        {hasPartner ? (
+          <View style={styles.partnerChip}>
+            <View style={styles.avatar}>
+              {eventPartner?.avatarUri ? (
+                <Image source={{ uri: eventPartner.avatarUri }} style={styles.avatarImage} resizeMode="cover" />
+              ) : (
+                <Text style={styles.avatarText}>{partnerName.slice(0, 1).toUpperCase()}</Text>
+              )}
+            </View>
+            <Text style={styles.partnerText}>{partnerName}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.rowWrap}>
+          <View style={styles.detailRow}>
+            <Ionicons name="time-outline" size={theme.sizing.iconMd} color={colors.textMuted} />
+            <View style={styles.detailTextWrap}>
+              <Text style={styles.detailLabel}>Duration</Text>
+              <Text style={styles.detailValue}>{`${event.durationMinutes} min`}</Text>
+            </View>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Ionicons name="shield-checkmark-outline" size={theme.sizing.iconMd} color={colors.textMuted} />
+            <View style={styles.detailTextWrap}>
+              <Text style={styles.detailLabel}>Protection</Text>
+              <Text style={styles.detailValue}>{toProtectionLabel(event.toysUsed)}</Text>
+            </View>
+          </View>
+
+          {hasNotes ? (
+            <View style={styles.detailRow}>
+              <Ionicons name="create-outline" size={theme.sizing.iconMd} color={colors.textMuted} />
+              <View style={styles.detailTextWrap}>
+                <Text style={styles.detailLabel}>Note</Text>
+                <Text style={styles.detailValue}>{noteValue}</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
-        {isTruthyText(event.notes) ? (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Notes</Text>
-            <Text style={styles.sectionText}>{event.notes}</Text>
-          </View>
-        ) : null}
-
-        {isTruthyText(event.whatWorkedWell) ? (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>What Worked Well</Text>
-            <Text style={styles.sectionText}>{event.whatWorkedWell}</Text>
-          </View>
-        ) : null}
-
-        {isTruthyText(event.whatToTryNext) ? (
-          <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>What To Try Next</Text>
-            <Text style={styles.sectionText}>{event.whatToTryNext}</Text>
-          </View>
-        ) : null}
-
-        <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Images</Text>
-          {eventMedia.length === 0 ? <Text style={styles.sectionText}>No images attached yet.</Text> : null}
-          {eventMedia.length > 0 ? (
+        {hasImages ? (
+          <View style={styles.imagesSection}>
+            <Text style={styles.imagesTitle}>Images</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.mediaScroll}>
               {eventMedia.map((item) => (
                 <View key={item.id} style={styles.mediaTile}>
@@ -306,35 +323,8 @@ export function EventDetailsScreen() {
                 </View>
               ))}
             </ScrollView>
-          ) : null}
-        </View>
-
-        <View style={styles.actionRow}>
-          <Pressable style={styles.actionButton} onPress={handleClose}>
-            <Text style={styles.actionText}>Close</Text>
-          </Pressable>
-          <Pressable style={styles.actionButton} onPress={() => router.replace(`/events/edit/${event.id}`)}>
-            <Text style={styles.actionText}>Edit</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.actionButton, styles.actionButtonDanger]}
-            onPress={() => {
-              Alert.alert('Delete event?', 'This removes the entry from this device.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: async () => {
-                    await deleteEvent(event.id);
-                    handleClose();
-                  },
-                },
-              ]);
-            }}
-          >
-            <Text style={[styles.actionText, styles.actionDangerText]}>Delete</Text>
-          </Pressable>
-        </View>
+          </View>
+        ) : null}
       </ScrollView>
     </SlideUpSheet>
   );

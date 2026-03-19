@@ -1,6 +1,7 @@
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoadingScreen } from '../../src/features/app/loading-screen';
 import { useAppState } from '../../src/features/app/app-context';
@@ -12,30 +13,77 @@ export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { isBootstrapping, user } = useAppState();
   const { colors, theme } = useTheme();
-  const tabBarHorizontalInset = theme.spacing.xs;
-  const tabBarHorizontalPadding = theme.spacing.md;
-  const tabBarHeight = theme.sizing.tabBarHeight;
-  const tabBarBottom = theme.spacing.xxl;
+  const tabBarHorizontalPadding = theme.spacing.lg;
+  const tabBarHeight = theme.sizing.tabBarHeight - 2;
+  const tabBarBottom = Math.max(theme.spacing.lg, insets.bottom + theme.spacing.xs);
+  const tabBarWidth = Math.min(viewportWidth - theme.spacing.xl * 2, 360);
   const fabSize = theme.sizing.buttonHeight + 6;
-  const fabBottom = tabBarBottom + tabBarHeight - fabSize * 0.72;
+  const fabBottom = tabBarBottom + tabBarHeight - fabSize * 0.74;
   const iconSize = theme.sizing.iconMd - 3;
-  const centerGap = fabSize + theme.spacing.xxs;
-  const barInnerWidth =
-    viewportWidth - tabBarHorizontalInset * 2 - tabBarHorizontalPadding * 2;
-  // const itemWidth = Math.max(48, (barInnerWidth - centerGap) / 4);
-  const itemWidth = Math.max(48, (barInnerWidth - centerGap) / 4);
+  const centerGap = fabSize + theme.spacing.md;
+  const barInnerWidth = tabBarWidth - tabBarHorizontalPadding * 2;
+  const itemWidth = Math.max(42, (barInnerWidth - centerGap) / 4);
 
   if (isBootstrapping) return <LoadingScreen />;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
+
+  const iconByRoute: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap }> =
+    {
+      index: { active: 'home', inactive: 'home-outline' },
+      calendar: { active: 'calendar', inactive: 'calendar-outline' },
+      insights: { active: 'stats-chart', inactive: 'stats-chart-outline' },
+      profile: { active: 'settings', inactive: 'settings-outline' },
+    };
 
   const styles = StyleSheet.create({
     root: {
       flex: 1,
     },
-    fabWrap: {
+    tabBarOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      top: 0,
+    },
+    tabBarWrap: {
       position: 'absolute',
       alignSelf: 'center',
+      width: tabBarWidth,
+      height: tabBarHeight,
+      bottom: tabBarBottom,
+      borderRadius: tabBarHeight / 2,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderMuted,
+      paddingHorizontal: tabBarHorizontalPadding,
+      ...theme.shadows.tabBar,
+    },
+    tabBarRow: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    centerSpacer: {
+      width: centerGap,
+      height: 1,
+    },
+    tabButton: {
+      width: itemWidth,
+      height: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 3,
+    },
+    tabLabel: {
+      fontSize: theme.typography.fontSize.xs - 1,
+      fontWeight: '600',
+    },
+    fabWrap: {
+      position: 'absolute',
       bottom: fabBottom,
+      left: '50%',
+      marginLeft: -fabSize / 2,
     },
     fabButton: {
       width: fabSize,
@@ -50,103 +98,96 @@ export default function TabsLayout() {
     },
   });
 
+  function CustomTabBar({ state, navigation, descriptors }: BottomTabBarProps) {
+    const visibleRoutes = state.routes.filter((route) => {
+      return route.name in iconByRoute;
+    });
+    const leftRoutes = visibleRoutes.slice(0, 2);
+    const rightRoutes = visibleRoutes.slice(2, 4);
+
+    const renderRoute = (route: (typeof visibleRoutes)[number]) => {
+      const options = descriptors[route.key].options;
+      const focused = state.index === state.routes.findIndex((candidate) => candidate.key === route.key);
+      const tabIcon = iconByRoute[route.name];
+      const tint = focused ? colors.accent : colors.textMuted;
+      const label = typeof options.title === 'string' ? options.title : route.name;
+
+      const onPress = () => {
+        const event = navigation.emit({
+          type: 'tabPress',
+          target: route.key,
+          canPreventDefault: true,
+        });
+        if (!focused && !event.defaultPrevented) {
+          navigation.navigate(route.name);
+        }
+      };
+
+      return (
+        <Pressable key={route.key} onPress={onPress} style={styles.tabButton}>
+          <Ionicons name={focused ? tabIcon.active : tabIcon.inactive} size={iconSize} color={tint} />
+          <Text style={[styles.tabLabel, { color: tint }]} numberOfLines={1}>
+            {label}
+          </Text>
+        </Pressable>
+      );
+    };
+
+    return (
+      <View pointerEvents="box-none" style={styles.tabBarOverlay}>
+        <View style={styles.tabBarWrap}>
+          <View style={styles.tabBarRow}>
+            {leftRoutes.map(renderRoute)}
+            <View style={styles.centerSpacer} />
+            {rightRoutes.map(renderRoute)}
+          </View>
+        </View>
+
+        <View style={styles.fabWrap} pointerEvents="box-none">
+          <Pressable
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="Log Event"
+            style={styles.fabButton}
+            onPress={() => router.push('/(tabs)/log')}
+          >
+            <Ionicons name="add" size={theme.sizing.iconLg} color={colors.textOnAccent} />
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <Tabs
+        tabBar={(props) => <CustomTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.textMuted,
-          tabBarStyle: {
-            position: 'absolute',
-            left: tabBarHorizontalInset,
-            right: tabBarHorizontalInset,
-            bottom: tabBarBottom,
-            backgroundColor: colors.surface,
-            borderColor: colors.borderMuted,
-            borderWidth: 1,
-            borderRadius: tabBarHeight / 2,
-            height: tabBarHeight,
-            paddingTop: 0,
-            paddingBottom: 0,
-            paddingHorizontal: tabBarHorizontalPadding,
-            overflow: 'hidden',
-            ...theme.shadows.tabBar,
-          },
-          tabBarItemStyle: {
-            flex: 0,
-            width: itemWidth,
-            justifyContent: 'center',
-          },
-          tabBarLabelStyle: {
-            fontSize: theme.typography.fontSize.xs - 1,
-            fontWeight: '600',
-          },
         }}
       >
         <Tabs.Screen
           name="index"
           options={{
             title: 'Home',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'home' : 'home-outline'}
-                size={iconSize}
-                color={color}
-              />
-            ),
           }}
         />
         <Tabs.Screen
           name="calendar"
           options={{
             title: 'Calendar',
-            tabBarItemStyle: {
-              flex: 0,
-              width: itemWidth,
-              justifyContent: 'center',
-              marginRight: centerGap / 2,
-            },
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'calendar' : 'calendar-outline'}
-                size={iconSize}
-                color={color}
-              />
-            ),
           }}
         />
         <Tabs.Screen
           name="insights"
           options={{
             title: 'Insights',
-            tabBarItemStyle: {
-              flex: 0,
-              width: itemWidth,
-              justifyContent: 'center',
-              paddingVertical: theme.spacing.xxs,
-              marginLeft: centerGap / 2,
-            },
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'stats-chart' : 'stats-chart-outline'}
-                size={iconSize}
-                color={color}
-              />
-            ),
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: 'Settings',
-            tabBarIcon: ({ color, focused }) => (
-              <Ionicons
-                name={focused ? 'settings' : 'settings-outline'}
-                size={iconSize}
-                color={color}
-              />
-            ),
           }}
         />
         <Tabs.Screen
@@ -162,18 +203,6 @@ export default function TabsLayout() {
           }}
         />
       </Tabs>
-
-      <View style={styles.fabWrap} pointerEvents="box-none">
-        <Pressable
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="Log Event"
-          style={styles.fabButton}
-          onPress={() => router.push('/(tabs)/log')}
-        >
-          <Ionicons name="add" size={theme.sizing.iconLg} color={colors.textOnAccent} />
-        </Pressable>
-      </View>
     </View>
   );
 }

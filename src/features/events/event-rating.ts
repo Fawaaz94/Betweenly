@@ -1,11 +1,11 @@
 export type EventRatingValue = 1 | 2 | 3 | 4 | 5;
 
 export const EVENT_RATING_OPTIONS: ReadonlyArray<{ value: EventRatingValue; emoji: string; label: string }> = [
-  { value: 1, emoji: '😖', label: 'Very bad' },
-  { value: 2, emoji: '😕', label: 'Bad' },
+  { value: 1, emoji: '😖', label: 'Damn' },
+  { value: 2, emoji: '😕', label: 'Uhmm' },
   { value: 3, emoji: '🤔', label: 'Okay' },
-  { value: 4, emoji: '🙂', label: 'Good' },
-  { value: 5, emoji: '😍', label: 'Amazing' },
+  { value: 4, emoji: '🙂', label: 'Mmm' },
+  { value: 5, emoji: '😍', label: 'OMG' },
 ];
 
 export function toEventRatingValue(value: number | null | undefined): EventRatingValue {

@@ -1,14 +1,29 @@
 import { Redirect, Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LoadingScreen } from '../../src/features/app/loading-screen';
 import { useAppState } from '../../src/features/app/app-context';
 import { useTheme } from '../../src/theme/use-theme';
 
 export default function TabsLayout() {
   const router = useRouter();
+  const { width: viewportWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { isBootstrapping, user } = useAppState();
   const { colors, theme } = useTheme();
+  const tabBarHorizontalInset = theme.spacing.xs;
+  const tabBarHorizontalPadding = theme.spacing.md;
+  const tabBarHeight = theme.sizing.tabBarHeight;
+  const tabBarBottom = theme.spacing.xxl;
+  const fabSize = theme.sizing.buttonHeight + 6;
+  const fabBottom = tabBarBottom + tabBarHeight - fabSize * 0.72;
+  const iconSize = theme.sizing.iconMd - 3;
+  const centerGap = fabSize + theme.spacing.xxs;
+  const barInnerWidth =
+    viewportWidth - tabBarHorizontalInset * 2 - tabBarHorizontalPadding * 2;
+  // const itemWidth = Math.max(48, (barInnerWidth - centerGap) / 4);
+  const itemWidth = Math.max(48, (barInnerWidth - centerGap) / 4);
 
   if (isBootstrapping) return <LoadingScreen />;
   if (!user) return <Redirect href="/(auth)/sign-in" />;
@@ -20,26 +35,18 @@ export default function TabsLayout() {
     fabWrap: {
       position: 'absolute',
       alignSelf: 'center',
-      bottom: theme.spacing.lg,
+      bottom: fabBottom,
     },
     fabButton: {
-      width: theme.sizing.buttonHeight,
-      height: theme.sizing.buttonHeight,
-      borderRadius: theme.radius.pill,
+      width: fabSize,
+      height: fabSize,
+      borderRadius: fabSize / 2,
       backgroundColor: colors.accent,
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 1,
       borderColor: colors.border,
       ...theme.shadows.card,
-    },
-    fabLabel: {
-      marginTop: theme.spacing.xs,
-      color: colors.textSecondary,
-      fontSize: theme.typography.fontSize.xs,
-      lineHeight: theme.typography.lineHeight.xs,
-      fontWeight: '600',
-      textAlign: 'center',
     },
   });
 
@@ -51,18 +58,25 @@ export default function TabsLayout() {
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.textMuted,
           tabBarStyle: {
+            position: 'absolute',
+            left: tabBarHorizontalInset,
+            right: tabBarHorizontalInset,
+            bottom: tabBarBottom,
             backgroundColor: colors.surface,
-            borderTopColor: colors.borderMuted,
-            borderTopWidth: 1,
-            height: theme.sizing.tabBarHeight,
+            borderColor: colors.borderMuted,
+            borderWidth: 1,
+            borderRadius: tabBarHeight / 2,
+            height: tabBarHeight,
             paddingTop: 0,
             paddingBottom: 0,
+            paddingHorizontal: tabBarHorizontalPadding,
+            overflow: 'hidden',
             ...theme.shadows.tabBar,
           },
           tabBarItemStyle: {
-            borderRadius: theme.radius.md,
+            flex: 0,
+            width: itemWidth,
             justifyContent: 'center',
-            paddingVertical: theme.spacing.xs,
           },
           tabBarLabelStyle: {
             fontSize: theme.typography.fontSize.xs - 1,
@@ -77,7 +91,7 @@ export default function TabsLayout() {
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? 'home' : 'home-outline'}
-                size={theme.sizing.iconMd}
+                size={iconSize}
                 color={color}
               />
             ),
@@ -88,12 +102,15 @@ export default function TabsLayout() {
           options={{
             title: 'Calendar',
             tabBarItemStyle: {
-                paddingRight: 38,
+              flex: 0,
+              width: itemWidth,
+              justifyContent: 'center',
+              marginRight: centerGap / 2,
             },
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? 'calendar' : 'calendar-outline'}
-                size={theme.sizing.iconMd}
+                size={iconSize}
                 color={color}
               />
             ),
@@ -102,16 +119,20 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="insights"
           options={{
-              title: 'Insights',
-              tabBarItemStyle: {
-                  // paddingLeft: 18,
-              },
-              tabBarIcon: ({ color, focused }) => (
-                  <Ionicons
-                    name={focused ? 'stats-chart' : 'stats-chart-outline'}
-                    size={theme.sizing.iconMd}
-                    color={color}
-                  />
+            title: 'Insights',
+            tabBarItemStyle: {
+              flex: 0,
+              width: itemWidth,
+              justifyContent: 'center',
+              paddingVertical: theme.spacing.xxs,
+              marginLeft: centerGap / 2,
+            },
+            tabBarIcon: ({ color, focused }) => (
+              <Ionicons
+                name={focused ? 'stats-chart' : 'stats-chart-outline'}
+                size={iconSize}
+                color={color}
+              />
             ),
           }}
         />
@@ -122,7 +143,7 @@ export default function TabsLayout() {
             tabBarIcon: ({ color, focused }) => (
               <Ionicons
                 name={focused ? 'settings' : 'settings-outline'}
-                size={theme.sizing.iconMd}
+                size={iconSize}
                 color={color}
               />
             ),
@@ -152,7 +173,6 @@ export default function TabsLayout() {
         >
           <Ionicons name="add" size={theme.sizing.iconLg} color={colors.textOnAccent} />
         </Pressable>
-        <Text style={styles.fabLabel}>Log Event</Text>
       </View>
     </View>
   );

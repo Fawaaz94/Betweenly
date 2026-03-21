@@ -1,6 +1,6 @@
 import { useMemo, type PropsWithChildren } from 'react';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { useRouter, useSegments, type Href } from 'expo-router';
 import {
   Pressable,
   ScrollView,
@@ -11,6 +11,7 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Theme, ThemeColors } from '../../theme';
 import { useTheme } from '../../theme/use-theme';
 
@@ -21,9 +22,17 @@ function useThemedStyles() {
 
 export function ScreenContainer({ children }: PropsWithChildren) {
   const styles = useThemedStyles();
+  const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
+  const segments = useSegments() as string[];
+  const isTabsRoute = segments.includes('(tabs)');
+  const bottomScrollInset = theme.spacing.xxxl + insets.bottom + (isTabsRoute ? theme.sizing.tabBarHeight + theme.spacing.md : 0);
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[styles.screenContent, { paddingBottom: bottomScrollInset }]}
+    >
       {children}
     </ScrollView>
   );

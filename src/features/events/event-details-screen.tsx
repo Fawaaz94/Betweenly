@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useSegments } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SlideUpSheet } from '../../components/ui/slide-up-sheet';
 import { formatDateTime } from '../../lib/date';
 import { useTheme } from '../../theme/use-theme';
@@ -28,9 +29,14 @@ function toProtectionLabel(value: string) {
 export function EventDetailsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const segments = useSegments() as string[];
+  const insets = useSafeAreaInsets();
   const { colors, theme } = useTheme();
   const { events, media, partners, saveMedia, updateEvent } = useAppState();
   const [isUploadingMedia, setIsUploadingMedia] = useState(false);
+  const isTabsRoute = segments.includes('(tabs)');
+  const bottomScrollInset =
+    theme.spacing.xxxl + insets.bottom + (isTabsRoute ? theme.sizing.tabBarHeight + theme.spacing.md : 0);
 
   const event = events.find((item) => item.id === id);
   const eventPartner = useMemo(
@@ -71,7 +77,7 @@ export function EventDetailsScreen() {
         },
         body: {
           paddingHorizontal: theme.spacing.lg,
-          paddingBottom: theme.spacing.xxl,
+          paddingBottom: bottomScrollInset,
         },
         title: {
           marginTop: theme.spacing.xs,
@@ -195,7 +201,7 @@ export function EventDetailsScreen() {
           height: '100%',
         },
       }),
-    [colors, theme],
+    [bottomScrollInset, colors, theme],
   );
 
   const handleClose = () => {

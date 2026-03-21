@@ -1,8 +1,9 @@
 import DateTimePicker, {type DateTimePickerEvent} from '@react-native-community/datetimepicker';
 import {Ionicons} from '@expo/vector-icons';
-import {useFocusEffect, useRouter} from 'expo-router';
+import {useFocusEffect, useRouter, useSegments} from 'expo-router';
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {toDateInput, toTimeInput} from '../../lib/date';
 import type {CreateEventInput, IntimacyEvent} from '../../types/models';
 import {EVENT_RATING_OPTIONS, type EventRatingValue, toEventRatingValue} from './event-rating';
@@ -48,9 +49,14 @@ type EventEntryScreenProps = {
 
 export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
   const router = useRouter();
+  const segments = useSegments() as string[];
   const { colors, theme, themeMode } = useTheme();
+  const insets = useSafeAreaInsets();
   const { saveEvent, updateEvent, user, activities, partners, events, activeLogDate, setActiveLogDate } = useAppState();
   const isEditMode = mode === 'edit' && Boolean(initialEvent);
+  const isTabsRoute = segments.includes('(tabs)');
+  const bottomComposerInset =
+    theme.spacing.xxxl + insets.bottom + (isTabsRoute ? theme.sizing.tabBarHeight + theme.spacing.md : 0);
 
   const [entryDate, setEntryDate] = useState(() =>
     initialEvent ? parseIsoDate(initialEvent.dateTimeStart) : mergeDateKeyWithCurrentTime(activeLogDate),
@@ -191,7 +197,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         },
         content: {
           paddingHorizontal: theme.spacing.lg,
-          paddingBottom: theme.spacing.xxl,
+          paddingBottom: bottomComposerInset,
           gap: theme.spacing.md,
         },
         header: {
@@ -535,7 +541,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
           fontWeight: '600',
         },
       }),
-    [colors, theme],
+    [bottomComposerInset, colors, theme],
   );
 
   const openPicker = (mode: Exclude<PickerMode, null>) => {

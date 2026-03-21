@@ -1,7 +1,8 @@
-import { useRouter } from 'expo-router';
+import { useRouter, useSegments } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Ionicons } from '@expo/vector-icons';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MonthCalendar } from '../../components/calendar/month-calendar';
 import { EventCard } from '../../components/events/event-card';
 import { EmptyText, Input } from '../../components/ui/primitives';
@@ -38,12 +39,17 @@ function getSearchableText(event: IntimacyEvent) {
 
 export function CalendarScreen() {
   const router = useRouter();
+  const segments = useSegments() as string[];
   const { colors, theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { events, setActiveLogDate } = useAppState();
   const [cursor, setCursor] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(toDateInput(new Date()));
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const isTabsRoute = segments.includes('(tabs)');
+  const bottomScrollInset =
+    theme.spacing.xxxl + insets.bottom + (isTabsRoute ? theme.sizing.tabBarHeight + theme.spacing.md : 0);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -83,7 +89,7 @@ export function CalendarScreen() {
           flex: 1,
           backgroundColor: colors.appBg,
           paddingHorizontal: theme.spacing.lg,
-          paddingBottom: theme.spacing.xxl,
+          paddingBottom: bottomScrollInset,
         },
         headerSection: {
           paddingTop: theme.spacing.sm,
@@ -150,6 +156,7 @@ export function CalendarScreen() {
         },
         eventsListContent: {
           paddingVertical: theme.spacing.xs,
+          paddingBottom: bottomScrollInset,
         },
         emptyWrap: {
           paddingHorizontal: theme.spacing.sm,
@@ -161,7 +168,7 @@ export function CalendarScreen() {
           lineHeight: theme.typography.lineHeight.xs,
         },
       }),
-    [colors, theme],
+    [bottomScrollInset, colors, theme],
   );
 
   const renderAgendaEvent = ({ item }: { item: IntimacyEvent }) => (

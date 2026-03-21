@@ -109,9 +109,16 @@ export function MonthCalendar({
                 style={[styles.calendarCell, isSelected ? styles.calendarCellSelected : null]}
                 onPress={() => onSelectDate(cell.dateKey)}
               >
-                <Text style={[styles.calendarDate, !cell.inCurrentMonth ? styles.calendarDateOutside : null]}>
-                  {cell.dayLabel}
-                </Text>
+                <View style={[styles.dateCircle, isSelected ? styles.dateCircleSelected : null]}>
+                  <Text
+                    style={[
+                      styles.calendarDate,
+                      !cell.inCurrentMonth && !isSelected ? styles.calendarDateOutside : null,
+                    ]}
+                  >
+                    {cell.dayLabel}
+                  </Text>
+                </View>
                 {eventCount > 0 ? (
                   <View style={styles.dotRow}>
                     {new Array(Math.min(4, eventCount)).fill(null).map((_, dotIndex) => (
@@ -170,6 +177,18 @@ function createStyles(theme: Theme, colors: ThemeColors) {
       fontSize: theme.typography.fontSize.sm,
       lineHeight: theme.typography.lineHeight.sm,
       fontWeight: '600',
+    },
+    dateCircle: {
+      minWidth: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.xxs,
+    },
+    dateCircleSelected: {
+      borderWidth: 1.5,
+      borderColor: colors.accent,
     },
     calendarDateOutside: {
       color: colors.textMuted,

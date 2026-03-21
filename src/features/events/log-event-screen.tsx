@@ -1,7 +1,7 @@
 import DateTimePicker, {type DateTimePickerEvent} from '@react-native-community/datetimepicker';
 import {Ionicons} from '@expo/vector-icons';
-import {useRouter} from 'expo-router';
-import {useEffect, useMemo, useState} from 'react';
+import {useFocusEffect, useRouter} from 'expo-router';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import {Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View,} from 'react-native';
 import {toDateInput, toTimeInput} from '../../lib/date';
 import type {CreateEventInput, IntimacyEvent} from '../../types/models';
@@ -83,6 +83,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     () => activities.find((activity) => activity.name.trim().toLowerCase() === 'sex')?.id ?? null,
     [activities],
   );
+  const defaultPartnerId = useMemo(() => partners.find((partner) => partner.isDefault)?.id ?? null, [partners]);
 
   useEffect(() => {
     if (mode !== 'create') return;
@@ -97,6 +98,15 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     const defaultActivityId = getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId);
     setSelectedActivityId(defaultActivityId);
   }, [activities, activityIds, isDefaultByActivityId, mode, selectedActivityId, sexActivityId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (mode !== 'create') return;
+
+      setSelectedPartnerId(defaultPartnerId);
+      setPendingPartnerId(defaultPartnerId);
+    }, [defaultPartnerId, mode]),
+  );
 
   useEffect(() => {
     if (mode !== 'create') return;
@@ -144,8 +154,12 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
   useEffect(() => {
     if (!selectedPartnerId) return;
     const exists = partners.some((partner) => partner.id === selectedPartnerId);
-    if (!exists) setSelectedPartnerId(null);
-  }, [partners, selectedPartnerId]);
+    if (exists) return;
+
+    const fallbackDefaultPartnerId = mode === 'create' ? defaultPartnerId : null;
+    setSelectedPartnerId(fallbackDefaultPartnerId);
+    setPendingPartnerId(fallbackDefaultPartnerId);
+  }, [defaultPartnerId, mode, partners, selectedPartnerId]);
 
   const selectedActivity = useMemo(
     () => activities.find((activity) => activity.id === selectedActivityId) ?? null,

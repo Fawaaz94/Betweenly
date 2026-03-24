@@ -15,10 +15,12 @@ function createMonthGrid(year: number, month: number): CalendarDayCell[][] {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const daysInPreviousMonth = new Date(year, month, 0).getDate();
+  const totalVisibleDays = firstDay + daysInMonth;
+  const totalCells = Math.ceil(totalVisibleDays / 7) * 7;
 
   const flatCells: CalendarDayCell[] = [];
 
-  for (let index = 0; index < 42; index += 1) {
+  for (let index = 0; index < totalCells; index += 1) {
     const dayOffset = index - firstDay + 1;
 
     if (dayOffset < 1) {

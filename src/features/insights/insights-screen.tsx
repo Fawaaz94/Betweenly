@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { EmptyText, ScreenContainer, ScreenTitle, SectionTitle } from '../../components/ui/primitives';
 import { calculateStreak } from '../../lib/date';
@@ -7,6 +7,48 @@ import { useAppState } from '../app/app-context';
 import type { IntimacyEvent } from '../../types/models';
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+const TIMING_CHART_HEIGHT = 92;
+const TIMING_CHART_HORIZONTAL_INSET = 12;
+const TIMING_CHART_TOP_INSET = 8;
+const TIMING_CHART_AXIS_BOTTOM_OFFSET = 10;
+const TIMING_CHART_MIN_POINT_GAP = 14;
+const TIMING_CHART_LINE_THICKNESS = 2;
+const TIMING_CHART_DOT_SIZE = 10;
+const TIMING_CHART_TAIL_OPACITY_SOFT = 0.12;
+const TIMING_CHART_TAIL_OPACITY_MID = 0.34;
+const TIMING_CHART_TAIL_MIN_LENGTH = 8;
+const TIMING_CHART_TAIL_MAX_LENGTH = 16;
+
+type TimingChartPoint = {
+  label: (typeof DAY_LABELS)[number];
+  x: number;
+  y: number;
+};
+
+type TimingChartSegment = {
+  key: string;
+  left: number;
+  top: number;
+  width: number;
+  angle: number;
+  opacity: number;
+};
+
+function buildTimingSegment(key: string, startX: number, startY: number, endX: number, endY: number, opacity = 1): TimingChartSegment {
+  const deltaX = endX - startX;
+  const deltaY = endY - startY;
+  const length = Math.max(1, Math.hypot(deltaX, deltaY));
+  const angle = Math.atan2(deltaY, deltaX);
+
+  return {
+    key,
+    left: (startX + endX) / 2 - length / 2,
+    top: (startY + endY) / 2 - TIMING_CHART_LINE_THICKNESS / 2,
+    width: length,
+    angle,
+    opacity,
+  };
+}
 
 function normalizeLabel(value: string | null | undefined, fallback: string) {
   const trimmed = value?.trim();
@@ -65,22 +107,27 @@ function getTopLabel(values: string[]) {
 export function InsightsScreen() {
   const { colors, theme } = useTheme();
   const { events } = useAppState();
+  const [timingChartWidth, setTimingChartWidth] = useState(0);
 
   const insights = useMemo(() => {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(startOfToday);
     startOfWeek.setDate(startOfToday.getDate() - startOfToday.getDay());
+    const startOfNextWeek = new Date(startOfWeek);
+    startOfNextWeek.setDate(startOfWeek.getDate() + 7);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const dayCounts = Array.from({ length: 7 }, () => 0);
+    const weekDayCounts = Array.from({ length: 7 }, () => 0);
     const hourCounts = Array.from({ length: 24 }, () => 0);
     let spontaneousCount = 0;
 
     for (const event of events) {
       const parsed = new Date(event.dateTimeStart);
       if (!Number.isNaN(+parsed)) {
-        dayCounts[parsed.getDay()] += 1;
+        if (+parsed >= +startOfWeek && +parsed < +startOfNextWeek) {
+          weekDayCounts[parsed.getDay()] += 1;
+        }
         hourCounts[parsed.getHours()] += 1;
       }
 
@@ -88,9 +135,10 @@ export function InsightsScreen() {
       if (isQuickCounter || event.durationMinutes === 0) spontaneousCount += 1;
     }
 
-    const mostActiveDayIndex = dayCounts.reduce((best, current, index, source) => (current > source[best] ? index : best), 0);
+    const mostActiveDayIndex = weekDayCounts.reduce((best, current, index, source) => (current > source[best] ? index : best), 0);
     const mostActiveHour = hourCounts.reduce((best, current, index, source) => (current > source[best] ? index : best), 0);
-    const maxDayCount = Math.max(1, ...dayCounts);
+    const hasWeekEntries = weekDayCounts.some((count) => count > 0);
+    const maxWeekDayCount = Math.max(1, ...weekDayCounts);
 
     const weekTotal = events.filter((event) => +new Date(event.dateTimeStart) >= +startOfWeek).length;
     const monthTotal = events.filter((event) => +new Date(event.dateTimeStart) >= +startOfMonth).length;
@@ -118,9 +166,9 @@ export function InsightsScreen() {
       monthTotal,
       currentStreak,
       longestStreak,
-      dayCounts,
-      maxDayCount,
-      mostActiveDayLabel: DAY_LABELS[mostActiveDayIndex] ?? '—',
+      weekDayCounts,
+      maxWeekDayCount,
+      mostActiveDayLabel: hasWeekEntries ? (DAY_LABELS[mostActiveDayIndex] ?? '—') : '—',
       goldenHourLabel: formatHourLabel(mostActiveHour),
       averageRating,
       averageDuration,
@@ -177,30 +225,55 @@ export function InsightsScreen() {
           paddingVertical: theme.spacing.md,
           gap: theme.spacing.sm,
         },
-        barsRow: {
-          flexDirection: 'row',
-          alignItems: 'flex-end',
-          justifyContent: 'space-between',
-          gap: theme.spacing.xs,
+        timingCard: {
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          borderRadius: theme.radius.xxl,
+          backgroundColor: colors.surface,
+          paddingHorizontal: theme.spacing.md,
+          paddingVertical: theme.spacing.md,
+          gap: theme.spacing.sm,
         },
-        dayColumn: {
-          flex: 1,
-          alignItems: 'center',
-          gap: theme.spacing.xs,
+        timingChartPlot: {
+          height: TIMING_CHART_HEIGHT,
+          position: 'relative',
+          marginTop: theme.spacing.xs,
         },
-        dayBarTrack: {
-          width: '100%',
-          height: 54,
-          borderRadius: theme.radius.md,
-          backgroundColor: colors.surfaceAlt,
-          justifyContent: 'flex-end',
-          overflow: 'hidden',
+        timingAxis: {
+          position: 'absolute',
+          left: TIMING_CHART_HORIZONTAL_INSET,
+          right: TIMING_CHART_HORIZONTAL_INSET,
+          bottom: TIMING_CHART_AXIS_BOTTOM_OFFSET,
+          height: 1,
+          backgroundColor: colors.border,
         },
-        dayBarFill: {
-          width: '100%',
-          borderRadius: theme.radius.md,
+        timingGuide: {
+          position: 'absolute',
+          width: 0,
+          borderLeftWidth: 1,
+          borderLeftColor: colors.borderMuted,
+          borderStyle: 'dashed',
+          opacity: theme.mode === 'dark' ? 0.85 : 0.95,
+        },
+        timingSegment: {
+          position: 'absolute',
+          height: TIMING_CHART_LINE_THICKNESS,
+          borderRadius: theme.radius.pill,
           backgroundColor: colors.accent,
-          minHeight: 3,
+        },
+        timingPoint: {
+          position: 'absolute',
+          width: TIMING_CHART_DOT_SIZE,
+          height: TIMING_CHART_DOT_SIZE,
+          borderRadius: TIMING_CHART_DOT_SIZE / 2,
+          backgroundColor: colors.accent,
+          borderWidth: 1,
+          borderColor: colors.surface,
+        },
+        timingLabelsRow: {
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          paddingHorizontal: TIMING_CHART_HORIZONTAL_INSET,
         },
         dayLabel: {
           color: colors.textMuted,
@@ -227,6 +300,48 @@ export function InsightsScreen() {
       }),
     [colors, theme],
   );
+
+  const timingChart = useMemo(() => {
+    const axisY = TIMING_CHART_HEIGHT - TIMING_CHART_AXIS_BOTTOM_OFFSET;
+    if (timingChartWidth <= TIMING_CHART_HORIZONTAL_INSET * 2) {
+      return { axisY, points: [], segments: [] };
+    }
+
+    const chartWidth = timingChartWidth - TIMING_CHART_HORIZONTAL_INSET * 2;
+    const step = DAY_LABELS.length > 1 ? chartWidth / (DAY_LABELS.length - 1) : 0;
+    const topY = TIMING_CHART_TOP_INSET;
+    const bottomY = axisY - TIMING_CHART_MIN_POINT_GAP;
+    const yRange = Math.max(1, bottomY - topY);
+
+    const points: TimingChartPoint[] = DAY_LABELS.map((label, index) => {
+      const dayCount = insights.weekDayCounts[index] ?? 0;
+      const ratio = insights.maxWeekDayCount > 0 ? dayCount / insights.maxWeekDayCount : 0;
+      const x = TIMING_CHART_HORIZONTAL_INSET + step * index;
+      const y = bottomY - ratio * yRange;
+      return { label, x, y };
+    });
+
+    const segments: TimingChartSegment[] = points
+      .slice(0, -1)
+      .map((point, index) => buildTimingSegment(`${point.label}-${points[index + 1].label}`, point.x, point.y, points[index + 1].x, points[index + 1].y));
+
+    if (points.length >= 1) {
+      const tailLength = Math.max(TIMING_CHART_TAIL_MIN_LENGTH, Math.min(TIMING_CHART_TAIL_MAX_LENGTH, step * 0.45));
+      const first = points[0];
+      const last = points[points.length - 1];
+      const leftSoftX = Math.max(2, first.x - tailLength);
+      const leftMidX = first.x - tailLength * 0.48;
+      const rightMidX = last.x + tailLength * 0.48;
+      const rightSoftX = Math.min(timingChartWidth - 2, last.x + tailLength);
+
+      segments.unshift(buildTimingSegment('tail-left-soft', leftSoftX, first.y, leftMidX, first.y, TIMING_CHART_TAIL_OPACITY_SOFT));
+      segments.unshift(buildTimingSegment('tail-left-mid', leftMidX, first.y, first.x, first.y, TIMING_CHART_TAIL_OPACITY_MID));
+      segments.push(buildTimingSegment('tail-right-mid', last.x, last.y, rightMidX, last.y, TIMING_CHART_TAIL_OPACITY_MID));
+      segments.push(buildTimingSegment('tail-right-soft', rightMidX, last.y, rightSoftX, last.y, TIMING_CHART_TAIL_OPACITY_SOFT));
+    }
+
+    return { axisY, points, segments };
+  }, [insights.maxWeekDayCount, insights.weekDayCounts, timingChartWidth]);
 
   return (
     <ScreenContainer>
@@ -267,21 +382,67 @@ export function InsightsScreen() {
       </View>
 
       <SectionTitle>Timing</SectionTitle>
-      <View style={styles.wideCard}>
+      <View style={styles.timingCard}>
         <Text style={styles.metricLabel}>Peak Day</Text>
         <Text style={styles.metricValue}>{insights.mostActiveDayLabel}</Text>
-        <View style={styles.barsRow}>
-          {DAY_LABELS.map((day, index) => {
-            const heightPercent = Math.max(6, Math.round((insights.dayCounts[index] / insights.maxDayCount) * 100));
+        <View
+          style={styles.timingChartPlot}
+          onLayout={(event) => {
+            const nextWidth = Math.round(event.nativeEvent.layout.width);
+            setTimingChartWidth((currentWidth) => (currentWidth === nextWidth ? currentWidth : nextWidth));
+          }}
+        >
+          <View style={styles.timingAxis} />
+          {timingChart.points.map((point) => {
+            const pointBottom = point.y + TIMING_CHART_DOT_SIZE / 2;
             return (
-              <View key={day} style={styles.dayColumn}>
-                <View style={styles.dayBarTrack}>
-                  <View style={[styles.dayBarFill, { height: `${heightPercent}%` }]} />
-                </View>
-                <Text style={styles.dayLabel}>{day}</Text>
-              </View>
+              <View
+                key={`${point.label}-guide`}
+                style={[
+                  styles.timingGuide,
+                  {
+                    left: point.x,
+                    top: pointBottom,
+                    height: Math.max(0, timingChart.axisY - pointBottom),
+                  },
+                ]}
+              />
             );
           })}
+          {timingChart.segments.map((segment) => (
+            <View
+              key={segment.key}
+              style={[
+                styles.timingSegment,
+                {
+                  left: segment.left,
+                  top: segment.top,
+                  width: segment.width,
+                  opacity: segment.opacity,
+                  transform: [{ rotateZ: `${segment.angle}rad` }],
+                },
+              ]}
+            />
+          ))}
+          {timingChart.points.map((point) => (
+            <View
+              key={`${point.label}-point`}
+              style={[
+                styles.timingPoint,
+                {
+                  left: point.x - TIMING_CHART_DOT_SIZE / 2,
+                  top: point.y - TIMING_CHART_DOT_SIZE / 2,
+                },
+              ]}
+            />
+          ))}
+        </View>
+        <View style={styles.timingLabelsRow}>
+          {DAY_LABELS.map((day) => (
+            <Text key={day} style={styles.dayLabel}>
+              {day}
+            </Text>
+          ))}
         </View>
       </View>
 

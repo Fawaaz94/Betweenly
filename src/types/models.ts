@@ -33,6 +33,7 @@ export type IntimacyEvent = {
   emotionalRating: number;
   notes: string;
   positions: string;
+  positionIds?: string[];
   toysUsed: string;
   whatWorkedWell: string;
   whatToTryNext: string;
@@ -89,3 +90,13 @@ export type Activity = {
 
 export type CreateActivityInput = Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateActivityInput = Partial<CreateActivityInput>;
+
+export type Position = {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreatePositionInput = Omit<Position, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdatePositionInput = Partial<CreatePositionInput>;

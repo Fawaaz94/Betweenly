@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type PropsWithChildren } from 'react';
-import { defaultThemeMode, getThemeColors, type ThemeColors, type ThemeMode } from '../../constants/theme';
+import { defaultThemeMode, getThemeColors, type ThemeColors, type ThemeMode } from '../../theme';
 import { DEFAULT_CYCLE_DATA, readPersistedAppData, writePersistedAppData, type PersistedAppData } from '../../lib/local-data-store';
 import { toDateInput, toTimeInput } from '../../lib/date';
 import type {
@@ -9,12 +9,15 @@ import type {
   CreateAppMediaInput,
   CreateEventInput,
   CreatePartnerInput,
+  CreatePositionInput,
   CycleData,
   IntimacyEvent,
   Partner,
+  Position,
   UpdateActivityInput,
   UpdateEventInput,
   UpdatePartnerInput,
+  UpdatePositionInput,
   UserProfile,
 } from '../../types/models';
 
@@ -28,6 +31,7 @@ type AppContextValue = {
   partners: Partner[];
   media: AppMedia[];
   activities: Activity[];
+  positions: Position[];
   cycleData: CycleData;
   themeMode: ThemeMode;
   colors: ThemeColors;
@@ -49,6 +53,9 @@ type AppContextValue = {
   updateActivity: (id: string, updates: UpdateActivityInput) => Promise<Activity | null>;
   deleteActivity: (id: string) => Promise<void>;
   setDefaultActivity: (id: string) => Promise<void>;
+  savePosition: (position: CreatePositionInput) => Promise<Position>;
+  updatePosition: (id: string, updates: UpdatePositionInput) => Promise<Position | null>;
+  deletePosition: (id: string) => Promise<void>;
   quickCounterIncrement: () => Promise<{ ok: true; eventId: string } | { ok: false; reason: 'missing_defaults' }>;
   quickCounterDecrement: () => Promise<{ ok: true; eventId: string } | { ok: false; reason: 'none' }>;
   quickCounterUndoAvailable: boolean;
@@ -79,6 +86,10 @@ function createMediaId() {
   return `md_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
 }
 
+function createPositionId() {
+  return `pos_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+}
+
 export function AppProvider({ children }: PropsWithChildren) {
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -86,6 +97,7 @@ export function AppProvider({ children }: PropsWithChildren) {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [media, setMedia] = useState<AppMedia[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [quickCounterUndoStack, setQuickCounterUndoStack] = useState<QuickCounterUndoItem[]>([]);
   const [activeLogDate, setActiveLogDateState] = useState<string | null>(null);
   const [cycleData, setCycleData] = useState<CycleData>(DEFAULT_CYCLE_DATA);
@@ -99,11 +111,12 @@ export function AppProvider({ children }: PropsWithChildren) {
         partners: next.partners ?? partners,
         media: next.media ?? media,
         activities: next.activities ?? activities,
+        positions: next.positions ?? positions,
         cycleData: next.cycleData ?? cycleData,
         themeMode: next.themeMode ?? themeMode,
       });
     },
-    [activities, cycleData, events, media, partners, themeMode, user],
+    [activities, cycleData, events, media, partners, positions, themeMode, user],
   );
 
   const bootstrap = useCallback(async () => {
@@ -114,6 +127,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     setPartners(data.partners);
     setMedia(data.media);
     setActivities(data.activities);
+    setPositions(data.positions);
     setCycleData(data.cycleData);
     setThemeModeState(data.themeMode);
     setIsBootstrapping(false);
@@ -488,6 +502,57 @@ export function AppProvider({ children }: PropsWithChildren) {
     [activities, persist],
   );
 
+  const savePosition = useCallback(
+    async (input: CreatePositionInput) => {
+      const now = new Date().toISOString();
+      const saved: Position = {
+        ...input,
+        id: createPositionId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const nextPositions = [...positions, saved].sort((a, b) => a.name.localeCompare(b.name));
+      setPositions(nextPositions);
+      await persist({ positions: nextPositions });
+      return saved;
+    },
+    [persist, positions],
+  );
+
+  const updatePosition = useCallback(
+    async (id: string, updates: UpdatePositionInput) => {
+      const existing = positions.find((position) => position.id === id);
+      if (!existing) return null;
+
+      const updated: Position = {
+        ...existing,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      };
+      const nextPositions = positions
+        .map((position) => (position.id === id ? updated : position))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      setPositions(nextPositions);
+      await persist({ positions: nextPositions });
+      return updated;
+    },
+    [persist, positions],
+  );
+
+  const deletePosition = useCallback(
+    async (id: string) => {
+      const nextPositions = positions.filter((position) => position.id !== id);
+      setPositions(nextPositions);
+      const nextEvents = events.map((event) => ({
+        ...event,
+        positionIds: (event.positionIds ?? []).filter((positionId) => positionId !== id),
+      }));
+      setEvents(nextEvents);
+      await persist({ positions: nextPositions, events: nextEvents });
+    },
+    [events, persist, positions],
+  );
+
   const value = useMemo<AppContextValue>(
     () => ({
       isBootstrapping,
@@ -496,6 +561,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       partners,
       media,
       activities,
+      positions,
       cycleData,
       themeMode,
       colors: getThemeColors(themeMode),
@@ -517,6 +583,9 @@ export function AppProvider({ children }: PropsWithChildren) {
       updateActivity,
       deleteActivity,
       setDefaultActivity,
+      savePosition,
+      updatePosition,
+      deletePosition,
       quickCounterIncrement,
       quickCounterDecrement,
       quickCounterUndoAvailable,
@@ -526,6 +595,7 @@ export function AppProvider({ children }: PropsWithChildren) {
     [
       activeLogDate,
       activities,
+      positions,
       createProfile,
       cycleData,
       deleteMedia,
@@ -542,6 +612,7 @@ export function AppProvider({ children }: PropsWithChildren) {
       saveEvent,
       saveMedia,
       saveActivity,
+      savePosition,
       savePartner,
       setDefaultPartner,
       setDefaultActivity,
@@ -552,9 +623,11 @@ export function AppProvider({ children }: PropsWithChildren) {
       updateActivity,
       updateEvent,
       updatePartner,
+      updatePosition,
       updateCycle,
       updateUser,
       user,
+      deletePosition,
     ],
   );
 

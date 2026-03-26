@@ -42,17 +42,37 @@ function isProtectionUsedValue(value: string) {
   return !value.toLowerCase().includes('not used');
 }
 
+function getHydratedPositionIds(event: IntimacyEvent, availablePositionNameById: Map<string, string>) {
+  if (Array.isArray(event.positionIds) && event.positionIds.length > 0) {
+    if (availablePositionNameById.size === 0) return event.positionIds;
+    return event.positionIds.filter((positionId) => availablePositionNameById.has(positionId));
+  }
+
+  const parsedNames = event.positions
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter((value) => value.length > 0);
+
+  // Fallback only for legacy comma-separated values to avoid conflicting with single-activity labels.
+  if (parsedNames.length < 2) return [];
+
+  return Array.from(availablePositionNameById.entries())
+    .filter(([, positionName]) => parsedNames.includes(positionName))
+    .map(([positionId]) => positionId);
+}
+
 type EventEntryScreenProps = {
   mode: 'create' | 'edit';
   initialEvent?: IntimacyEvent;
 };
 
-export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
+function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
   const router = useRouter();
   const segments = useSegments() as string[];
   const { colors, theme, themeMode } = useTheme();
   const insets = useSafeAreaInsets();
-  const { saveEvent, updateEvent, user, activities, partners, events, activeLogDate, setActiveLogDate } = useAppState();
+  const { saveEvent, updateEvent, user, activities, positions, partners, events, activeLogDate, setActiveLogDate } =
+    useAppState();
   const isEditMode = mode === 'edit' && Boolean(initialEvent);
   const isTabsRoute = segments.includes('(tabs)');
   const bottomComposerInset =
@@ -71,6 +91,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
   const [rating, setRating] = useState<EventRatingValue>(() => toEventRatingValue(initialEvent?.overallRating));
   const [protectionUsed, setProtectionUsed] = useState(() => (initialEvent ? isProtectionUsedValue(initialEvent.toysUsed) : true));
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [selectedPositionIds, setSelectedPositionIds] = useState<string[]>([]);
   const [pendingActivityId, setPendingActivityId] = useState<string | null>(null);
   const [selectedPartnerId, setSelectedPartnerId] = useState<string | null>(null);
   const [pendingPartnerId, setPendingPartnerId] = useState<string | null>(null);
@@ -90,6 +111,10 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     [activities],
   );
   const defaultPartnerId = useMemo(() => partners.find((partner) => partner.isDefault)?.id ?? null, [partners]);
+  const positionNameById = useMemo(
+    () => new Map(positions.map((position) => [position.id, position.name.trim().toLowerCase()])),
+    [positions],
+  );
 
   useEffect(() => {
     if (mode !== 'create') return;
@@ -104,6 +129,10 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     const defaultActivityId = getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId);
     setSelectedActivityId(defaultActivityId);
   }, [activities, activityIds, isDefaultByActivityId, mode, selectedActivityId, sexActivityId]);
+
+  useEffect(() => {
+    setSelectedPositionIds((currentIds) => currentIds.filter((positionId) => positionNameById.has(positionId)));
+  }, [positionNameById]);
 
   useFocusEffect(
     useCallback(() => {
@@ -124,7 +153,6 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
   useEffect(() => {
     if (!isEditMode || !initialEvent) return;
     if (hydratedEventId === initialEvent.id) return;
-    if (activities.length === 0) return;
 
     const matchedActivity = activities.find(
       (activity) => activity.name.trim().toLowerCase() === initialEvent.positions.trim().toLowerCase(),
@@ -142,6 +170,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     setSelectedActivityId(
       matchedActivity?.id ?? getDefaultActivityId(activityIds, isDefaultByActivityId, sexActivityId),
     );
+    setSelectedPositionIds(getHydratedPositionIds(initialEvent, positionNameById));
     setPendingActivityId(matchedActivity?.id ?? null);
     setSelectedPartnerId(matchedPartner?.id ?? null);
     setPendingPartnerId(matchedPartner?.id ?? null);
@@ -154,6 +183,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     isDefaultByActivityId,
     isEditMode,
     partners,
+    positionNameById,
     sexActivityId,
   ]);
 
@@ -287,6 +317,46 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
           fontSize: theme.typography.fontSize.lg,
           lineHeight: theme.typography.lineHeight.lg,
           fontWeight: '500',
+        },
+        positionsWrap: {
+          paddingHorizontal: theme.spacing.md,
+          paddingTop: theme.spacing.sm,
+          paddingBottom: theme.spacing.md,
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          columnGap: theme.spacing.xs + 2,
+          rowGap: theme.spacing.xs + 2,
+          alignItems: 'center',
+        },
+        positionChip: {
+          minHeight: 32,
+          borderRadius: theme.radius.pill,
+          borderWidth: 1,
+          borderColor: colors.borderMuted,
+          backgroundColor: colors.surfaceAlt,
+          paddingVertical: theme.spacing.xs + 1,
+          paddingHorizontal: theme.spacing.sm + 2,
+          alignItems: 'center',
+          justifyContent: 'center',
+          alignSelf: 'flex-start',
+          maxWidth: '100%',
+        },
+        positionChipActive: {
+          borderColor: colors.accent,
+          backgroundColor: colors.chipActiveBg,
+        },
+        positionChipText: {
+          color: colors.textSecondary,
+          fontSize: theme.typography.fontSize.sm,
+          lineHeight: theme.typography.lineHeight.sm,
+          fontWeight: '600',
+          textAlign: 'center',
+        },
+        positionChipTextActive: {
+          color: colors.textOnAccent,
+        },
+        positionChipAddText: {
+          color: colors.accent,
         },
         protectionWrap: {
           flexDirection: 'row',
@@ -586,6 +656,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         : protectionUsed
           ? 'Protection: Used'
           : 'Protection: Not used';
+      const persistedPositionIds = selectedPositionIds.filter((positionId) => positionNameById.has(positionId));
       const payload: CreateEventInput = {
         ownerUserId: user?.email ?? 'local_user',
         eventType: partnerForEvent ? 'partnered' : 'solo',
@@ -598,6 +669,7 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
         emotionalRating: rating,
         notes: notes.trim(),
         positions: selectedActivity.name,
+        positionIds: persistedPositionIds,
         toysUsed: protectionValue,
         whatWorkedWell: initialEvent?.whatWorkedWell ?? '',
         whatToTryNext: initialEvent?.whatToTryNext ?? '',
@@ -642,6 +714,13 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     () => [...activities].sort((a, b) => (a.isDefault === b.isDefault ? a.name.localeCompare(b.name) : a.isDefault ? -1 : 1)),
     [activities],
   );
+  const sortedPositions = useMemo(() => [...positions].sort((a, b) => a.name.localeCompare(b.name)), [positions]);
+  const orderedPositions = useMemo(() => {
+    if (selectedPositionIds.length === 0) return sortedPositions;
+    const selected = sortedPositions.filter((position) => selectedPositionIds.includes(position.id));
+    const unselected = sortedPositions.filter((position) => !selectedPositionIds.includes(position.id));
+    return [...selected, ...unselected];
+  }, [selectedPositionIds, sortedPositions]);
 
   return (
     <View style={styles.container}>
@@ -688,6 +767,44 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
               </View>
             </>
           ) : null}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.rowLabel}>Positions</Text>
+            <Pressable onPress={() => router.push('/positions/new')}>
+              <Text style={styles.rowValueAccent}>Add</Text>
+            </Pressable>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.positionsWrap}>
+            {orderedPositions.map((position) => {
+              const isSelected = selectedPositionIds.includes(position.id);
+              return (
+                <Pressable
+                  key={position.id}
+                  onPress={() =>
+                    setSelectedPositionIds((currentIds) =>
+                      currentIds.includes(position.id)
+                        ? currentIds.filter((positionId) => positionId !== position.id)
+                        : [...currentIds, position.id],
+                    )
+                  }
+                  style={[styles.positionChip, isSelected ? styles.positionChipActive : null]}
+                >
+                  <Text style={[styles.positionChipText, isSelected ? styles.positionChipTextActive : null]}>
+                    {position.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+
+            {orderedPositions.length === 0 ? (
+              <Pressable onPress={() => router.push('/positions/new')} style={styles.positionChip}>
+                <Text style={[styles.positionChipText, styles.positionChipAddText]}>Create first position</Text>
+              </Pressable>
+            ) : null}
+          </View>
         </View>
 
         {!shouldHidePartnerAndProtectionSections ? (
@@ -977,6 +1094,8 @@ export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) 
     </View>
   );
 }
+
+export default EventEntryScreen
 
 export function LogEventScreen() {
   return <EventEntryScreen mode="create" />;

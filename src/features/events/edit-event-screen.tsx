@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { GhostButton, ScreenContainer, ScreenTitle } from '../../components/ui/primitives';
 import { useAppState } from '../app/app-context';
-import { EventEntryScreen } from './log-event-screen';
+import EventEntryScreen from './log-event-screen';
 
 export function EditEventScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();

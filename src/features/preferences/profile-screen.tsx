@@ -24,6 +24,7 @@ const settingsSections: SettingsSection[] = [
     items: [
       { label: 'Activities', icon: 'apps-outline', route: '/activities' },
       { label: 'Partners', icon: 'people-outline', route: '/partner/shared' },
+      { label: 'Positions', icon: 'body-outline', route: '/positions' },
       { label: 'Media Gallery', icon: 'images-outline', route: '/media-gallery' },
     ],
   },

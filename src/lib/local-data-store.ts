@@ -1,8 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEFAULT_ACTIVITY_TEMPLATES } from '../constants/activities';
-import { defaultThemeMode, type ThemeMode } from '../constants/theme';
+import { defaultThemeMode, type ThemeMode } from '../theme';
 import { toDateInput } from './date';
-import type { Activity, AppMedia, CycleData, IntimacyEvent, Partner, UserProfile } from '../types/models';
+import type { Activity, AppMedia, CycleData, IntimacyEvent, Partner, Position, UserProfile } from '../types/models';
 
 const STORAGE_KEY = 'betweenly.local.data.v1';
 
@@ -12,6 +12,7 @@ export type PersistedAppData = {
   partners: Partner[];
   media: AppMedia[];
   activities: Activity[];
+  positions: Position[];
   cycleData: CycleData;
   themeMode: ThemeMode;
 };
@@ -23,6 +24,8 @@ export const DEFAULT_CYCLE_DATA: CycleData = {
   updatedAt: new Date().toISOString(),
 };
 
+const DEFAULT_POSITION_TEMPLATES = ['Missionary', 'Doggy Style', 'Cowgirl', 'Oral'] as const;
+
 const DEFAULT_DATA: PersistedAppData = {
   user: null,
   events: [],
@@ -33,6 +36,12 @@ const DEFAULT_DATA: PersistedAppData = {
     name: activity.name,
     icon: activity.icon,
     isDefault: activity.isDefault,
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  })),
+  positions: DEFAULT_POSITION_TEMPLATES.map((name, index) => ({
+    id: `pos_default_${index + 1}`,
+    name,
     createdAt: new Date(0).toISOString(),
     updatedAt: new Date(0).toISOString(),
   })),
@@ -104,8 +113,21 @@ function normalizeActivities(activities: Activity[]): Activity[] {
 function normalizeEvents(events: IntimacyEvent[]): IntimacyEvent[] {
   return events.map((event) => ({
     ...event,
-    mediaIds: Array.isArray(event.mediaIds) ? event.mediaIds.filter((id) => typeof id === 'string') : [],
+    mediaIds: Array.isArray(event.mediaIds) ? event.mediaIds.filter(() => true) : [],
+    positionIds: Array.isArray(event.positionIds) ? event.positionIds.filter(() => true) : [],
   }));
+}
+
+function normalizePositions(positions: Position[]): Position[] {
+  if (positions.length === 0) return DEFAULT_DATA.positions;
+
+  return positions
+    .map((position) => ({
+      ...position,
+      name: position.name.trim(),
+    }))
+    .filter((position) => position.name.length > 0)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function readPersistedAppData(): Promise<PersistedAppData> {
@@ -116,6 +138,9 @@ export async function readPersistedAppData(): Promise<PersistedAppData> {
     const parsed = asObject(JSON.parse(raw));
     const partners = Array.isArray(parsed.partners) ? normalizePartners(parsed.partners as Partner[]) : [];
     const events = Array.isArray(parsed.events) ? normalizeEvents(parsed.events as IntimacyEvent[]) : [];
+    const positions = Array.isArray(parsed.positions)
+      ? normalizePositions(parsed.positions as Position[])
+      : DEFAULT_DATA.positions;
     return {
       user: (parsed.user as UserProfile | null) ?? null,
       events,
@@ -124,6 +149,7 @@ export async function readPersistedAppData(): Promise<PersistedAppData> {
       activities: Array.isArray(parsed.activities)
         ? normalizeActivities(parsed.activities as Activity[])
         : DEFAULT_DATA.activities,
+      positions,
       cycleData: (parsed.cycleData as CycleData) ?? DEFAULT_CYCLE_DATA,
       themeMode: (parsed.themeMode as ThemeMode) ?? defaultThemeMode,
     };

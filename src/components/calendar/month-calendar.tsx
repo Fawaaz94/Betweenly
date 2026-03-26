@@ -76,6 +76,7 @@ export function MonthCalendar({
 }) {
   const { colors, theme } = useTheme();
   const styles = useMemo(() => createStyles(theme, colors), [colors, theme]);
+  const todayKey = useMemo(() => toDateInput(new Date()), []);
 
   const matrix = useMemo(() => createMonthGrid(year, month), [month, year]);
   const eventCountByDay = useMemo(() => {
@@ -103,6 +104,7 @@ export function MonthCalendar({
         <View key={`${weekIndex}`} style={styles.calendarWeekRow}>
           {week.map((cell) => {
             const isSelected = cell.dateKey === selectedDate;
+            const isToday = cell.dateKey === todayKey;
             const eventCount = eventCountByDay.get(cell.dateKey) ?? 0;
 
             return (
@@ -111,11 +113,18 @@ export function MonthCalendar({
                 style={[styles.calendarCell, isSelected ? styles.calendarCellSelected : null]}
                 onPress={() => onSelectDate(cell.dateKey)}
               >
-                <View style={[styles.dateCircle, isSelected ? styles.dateCircleSelected : null]}>
+                <View
+                  style={[
+                    styles.dateCircle,
+                    isToday && !isSelected ? styles.dateCircleToday : null,
+                    isSelected ? styles.dateCircleSelected : null,
+                  ]}
+                >
                   <Text
                     style={[
                       styles.calendarDate,
-                      !cell.inCurrentMonth && !isSelected ? styles.calendarDateOutside : null,
+                      isToday ? styles.calendarDateToday : null,
+                      !cell.inCurrentMonth && !isSelected && !isToday ? styles.calendarDateOutside : null,
                     ]}
                   >
                     {cell.dayLabel}
@@ -188,13 +197,28 @@ function createStyles(theme: Theme, colors: ThemeColors) {
       justifyContent: 'center',
       paddingHorizontal: theme.spacing.xxs,
     },
+    dateCircleToday: {
+      borderWidth: 1,
+      borderColor: colors.accent,
+      backgroundColor: colors.selectedSurface,
+    },
     dateCircleSelected: {
       borderWidth: 1.5,
       borderColor: colors.accent,
     },
+    calendarDateToday: {
+      color: colors.accent,
+      fontWeight: '700',
+    },
     calendarDateOutside: {
       color: colors.textMuted,
       opacity: 0.6,
+    },
+    todayMarker: {
+      width: 4,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.accent,
     },
     dotRow: {
       flexDirection: 'row',

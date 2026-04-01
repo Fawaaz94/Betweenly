@@ -10,7 +10,7 @@ type IconName = ComponentProps<typeof Ionicons>['name'];
 type SettingsItem = {
   label: string;
   icon: IconName;
-  route?: Href;
+  route: Href;
 };
 
 type SettingsSection = {
@@ -29,25 +29,10 @@ const settingsSections: SettingsSection[] = [
     ],
   },
   {
-    key: 'location',
+    key: 'general',
     items: [
-      { label: 'Locations', icon: 'location-outline', route: '/(tabs)/calendar' },
-      { label: 'Map', icon: 'map-outline' },
-    ],
-  },
-  {
-    key: 'system',
-    items: [
+      { label: 'Calendar', icon: 'calendar-outline', route: '/(tabs)/calendar' },
       { label: 'Settings', icon: 'settings-outline', route: '/(tabs)/settings' },
-      { label: 'Sync & Share', icon: 'cloud-upload-outline', route: '/partner/link' },
-      { label: 'Backup & Restore', icon: 'refresh-circle-outline' },
-    ],
-  },
-  {
-    key: 'about',
-    items: [
-      { label: 'Write a Review', icon: 'star-outline' },
-      { label: 'About', icon: 'information-circle-outline' },
     ],
   },
 ];
@@ -109,13 +94,12 @@ export function ProfileScreen() {
         <View key={section.key} style={styles.sectionCard}>
           {section.items.map((item, index) => {
             const isLast = index === section.items.length - 1;
-            const route = item.route;
 
             return (
               <View key={item.label}>
                 <Pressable
-                  onPress={route ? () => router.push(route) : undefined}
-                  style={({ pressed }) => [styles.row, pressed && route ? styles.rowPressed : null]}
+                  onPress={() => router.push(item.route)}
+                  style={({ pressed }) => [styles.row, pressed ? styles.rowPressed : null]}
                 >
                   <View style={styles.rowLeft}>
                     <Ionicons name={item.icon} size={theme.sizing.iconMd} color={colors.textSecondary} />

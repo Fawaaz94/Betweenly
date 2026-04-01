@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import type { ThemeColors } from '../../constants/theme';
+import type { ThemeColors } from '../../theme';
 import { useAppState } from './app-context';
 
 export function LoadingScreen({ label = 'Loading private workspace...' }: { label?: string }) {

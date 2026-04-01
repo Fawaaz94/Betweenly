@@ -66,7 +66,7 @@ type EventEntryScreenProps = {
   initialEvent?: IntimacyEvent;
 };
 
-function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
+export function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
   const router = useRouter();
   const segments = useSegments() as string[];
   const { colors, theme, themeMode } = useTheme();
@@ -1094,8 +1094,6 @@ function EventEntryScreen({ mode, initialEvent }: EventEntryScreenProps) {
     </View>
   );
 }
-
-export default EventEntryScreen
 
 export function LogEventScreen() {
   return <EventEntryScreen mode="create" />;
